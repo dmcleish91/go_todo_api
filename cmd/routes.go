@@ -52,7 +52,7 @@ func (app *application) Routes() *echo.Echo {
 
 func ServerHeader(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		c.Response().Header().Set(echo.HeaderServer, "PetAgency/0.1")
+		c.Response().Header().Set(echo.HeaderServer, "TodoApi/0.1")
 
 		return next(c)
 	}

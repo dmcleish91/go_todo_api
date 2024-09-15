@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -77,18 +78,6 @@ func (app *application) Login(ctx echo.Context) error {
 	})
 }
 
-// Get user details by email
-func (app *application) GetUserByEmail(c echo.Context) error {
-	email := c.Param("email")
-
-	user, err := app.users.GetUserByEmail(email)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
-	}
-
-	return c.JSON(http.StatusOK, user)
-}
-
 // Update user email
 func (app *application) UpdateUserEmail(c echo.Context) error {
 	type UpdateEmailInput struct {
@@ -119,6 +108,13 @@ func (app *application) AddTodoHandler(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
 	}
 
+	userID := GetUserIdFromToken(c)
+	if userID == -1 {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Server can't process request"})
+	}
+
+	todo.UserID = userID
+
 	rowsAffected, err := app.todos.AddTodo(todo)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
@@ -132,9 +128,9 @@ func (app *application) AddTodoHandler(c echo.Context) error {
 
 // Get todos by user ID
 func (app *application) GetTodosByUserID(c echo.Context) error {
-	userID, err := strconv.Atoi(c.Param("user_id"))
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
+	userID := GetUserIdFromToken(c)
+	if userID == -1 {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Server can't process request"})
 	}
 
 	todos, err := app.todos.GetTodosByUserID(userID)
@@ -231,7 +227,9 @@ func createJwtToken(userID int, username string) (string, error) {
 	// Create token with claims
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	tokenString, err := token.SignedString([]byte("itsasecret"))
+	signingKey := os.Getenv("SigningKey")
+
+	tokenString, err := token.SignedString([]byte(signingKey))
 	if err != nil {
 		return "", err
 	}

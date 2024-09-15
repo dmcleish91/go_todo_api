@@ -41,7 +41,7 @@ func (m *TodoModel) AddTodo(todo Todo) (int64, error) {
 func (m *TodoModel) GetTodosByUserID(userID int) ([]Todo, error) {
     query := `
     SELECT 
-        t.todo_id, t.title, t.description, t.is_completed, t.due_date, t.created_at, t.updated_at, 
+        t.todo_id, t.user_id, t.title, t.description, t.is_completed, t.due_date, t.created_at, t.updated_at, 
         STRING_AGG(tag.name, ', ') AS tags
     FROM todos t
     LEFT JOIN todo_tags tt ON t.todo_id = tt.todo_id
@@ -62,7 +62,7 @@ func (m *TodoModel) GetTodosByUserID(userID int) ([]Todo, error) {
         var todo Todo
         var tags *string
 
-        err := rows.Scan(&todo.ID, &todo.Title, &todo.Description, &todo.IsCompleted, &todo.DueDate, &todo.CreatedAt, &todo.UpdatedAt, &tags)
+        err := rows.Scan(&todo.ID, &todo.UserID, &todo.Title, &todo.Description, &todo.IsCompleted, &todo.DueDate, &todo.CreatedAt, &todo.UpdatedAt, &tags)
         if err != nil {
             return nil, fmt.Errorf("unable to scan row: %v", err)
         }

@@ -27,9 +27,8 @@ func (app *application) Routes() *echo.Echo {
 		Format: `[${time_rfc3339} ${status} ${method} ${host}${path} ${latency_human}]` + "\n",
 	}))
 
-	secured := e.Group("/secure")
+	secured := e.Group("/v1")
 
-	
 	config := echojwt.Config{
 		NewClaimsFunc: func(c echo.Context) jwt.Claims {
 			return new(jwtCustomClaims)
@@ -43,6 +42,10 @@ func (app *application) Routes() *echo.Echo {
 	e.POST("/register", app.RegisterUser)
 
 	e.POST("/login", app.Login)
+
+	secured.GET("/todos", app.GetTodosByUserID)
+
+	secured.POST("/todos", app.AddTodoHandler)
 
 	return e
 }

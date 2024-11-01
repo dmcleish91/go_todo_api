@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/dmcleish91/go_todo_api/internal/models"
@@ -9,19 +10,25 @@ import (
 
 type application struct {
 	users *models.UserModel
-	todos  *models.TodoModel
+	todos *models.TodoModel
 }
 
 func main() {
 	godotenv.Load()
-	DATABASE_URL := os.Getenv("DATABASE_URL")
+	user := os.Getenv("user")
+	password := os.Getenv("password")
+	host := os.Getenv("host")
+	port := os.Getenv("port")
+	dbname := os.Getenv("dbname")
+
+	DATABASE_URL := fmt.Sprintf("postgresql://%s:%s@%s:%s/%s", user, password, host, port, dbname)
 
 	conn := CreateDatabaseConnection(DATABASE_URL)
 	defer conn.Close()
 
 	app := &application{
 		users: &models.UserModel{DB: conn},
-		todos:  &models.TodoModel{DB: conn},
+		todos: &models.TodoModel{DB: conn},
 	}
 
 	e := app.Routes()

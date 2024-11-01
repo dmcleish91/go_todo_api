@@ -15,7 +15,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// User registration handler
 func (app *application) RegisterUser(c echo.Context) error {
 	username := c.FormValue("username")
 	email := c.FormValue("email")
@@ -102,7 +101,7 @@ func (app *application) UpdateUserEmail(c echo.Context) error {
 }
 
 // Add a new todo
-func (app *application) AddTodoHandler(c echo.Context) error {
+func (app *application) AddTodo(c echo.Context) error {
 	var todo models.Todo
 	if err := c.Bind(&todo); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
@@ -142,38 +141,39 @@ func (app *application) GetTodosByUserID(c echo.Context) error {
 }
 
 // Mark a todo as completed
-func (app *application) MarkTodoCompleteHandler(c echo.Context) error {
-	todoID, err := strconv.Atoi(c.Param("todo_id"))
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid todo ID"})
-	}
-
-	userID, err := strconv.Atoi(c.Param("user_id"))
-	if err != nil {
+func (app *application) ToggleTodoCompleted(c echo.Context) error {
+	todoIDStr := c.QueryParam("todo_id")
+	todoID, err := strconv.Atoi(todoIDStr)
+	if err != nil || todoIDStr == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
 	}
 
-	rowsAffected, err := app.todos.MarkTodoComplete(todoID, userID)
+	userID := GetUserIdFromToken(c)
+	if userID == -1 {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Server can't process request"})
+	}
+
+	rowsAffected, err := app.todos.ToggleTodoCompleted(todoID, userID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"message":       "Todo marked as completed",
+		"message":       "Todo status has been toggled",
 		"rows_affected": rowsAffected,
 	})
 }
 
 // Delete a todo
-func (app *application) DeleteTodoHandler(c echo.Context) error {
+func (app *application) DeleteTodo(c echo.Context) error {
 	todoID, err := strconv.Atoi(c.Param("todo_id"))
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid todo ID"})
 	}
 
-	userID, err := strconv.Atoi(c.Param("user_id"))
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
+	userID := GetUserIdFromToken(c)
+	if userID == -1 {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Server can't process request"})
 	}
 
 	rowsAffected, err := app.todos.DeleteTodoByID(todoID, userID)
@@ -188,7 +188,7 @@ func (app *application) DeleteTodoHandler(c echo.Context) error {
 }
 
 // Add a tag to a todo
-func (app *application) AddTagToTodoHandler(c echo.Context) error {
+func (app *application) AddTagToTodo(c echo.Context) error {
 	todoID, err := strconv.Atoi(c.Param("todo_id"))
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid todo ID"})
@@ -209,8 +209,6 @@ func (app *application) AddTagToTodoHandler(c echo.Context) error {
 		"rows_affected": rowsAffected,
 	})
 }
-
-// These are utility functions
 
 func createJwtToken(userID int, username string) (string, error) {
 	// Set custom claims

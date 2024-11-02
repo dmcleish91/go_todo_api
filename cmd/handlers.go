@@ -6,7 +6,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/dmcleish91/go_todo_api/internal/models"
@@ -101,7 +103,7 @@ func (app *application) UpdateUserEmail(c echo.Context) error {
 }
 
 // Add a new todo
-func (app *application) AddTodo(c echo.Context) error {
+func (app *application) AddNewTodo(c echo.Context) error {
 	var todo models.Todo
 	if err := c.Bind(&todo); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
@@ -109,7 +111,7 @@ func (app *application) AddTodo(c echo.Context) error {
 
 	userID := GetUserIdFromToken(c)
 	if userID == -1 {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Server can't process request"})
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "This server can't process this request"})
 	}
 
 	todo.UserID = userID
@@ -125,11 +127,10 @@ func (app *application) AddTodo(c echo.Context) error {
 	})
 }
 
-// Get todos by user ID
 func (app *application) GetTodosByUserID(c echo.Context) error {
 	userID := GetUserIdFromToken(c)
 	if userID == -1 {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Server can't process request"})
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "This server can't process this request"})
 	}
 
 	todos, err := app.todos.GetTodosByUserID(userID)
@@ -140,7 +141,6 @@ func (app *application) GetTodosByUserID(c echo.Context) error {
 	return c.JSON(http.StatusOK, todos)
 }
 
-// Mark a todo as completed
 func (app *application) ToggleTodoCompleted(c echo.Context) error {
 	todoIDStr := c.QueryParam("todo_id")
 	todoID, err := strconv.Atoi(todoIDStr)
@@ -150,7 +150,7 @@ func (app *application) ToggleTodoCompleted(c echo.Context) error {
 
 	userID := GetUserIdFromToken(c)
 	if userID == -1 {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Server can't process request"})
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "This server can't process this request"})
 	}
 
 	rowsAffected, err := app.todos.ToggleTodoCompleted(todoID, userID)
@@ -164,16 +164,16 @@ func (app *application) ToggleTodoCompleted(c echo.Context) error {
 	})
 }
 
-// Delete a todo
 func (app *application) DeleteTodo(c echo.Context) error {
-	todoID, err := strconv.Atoi(c.Param("todo_id"))
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid todo ID"})
+	todoIDStr := c.QueryParam("todo_id")
+	todoID, err := strconv.Atoi(todoIDStr)
+	if err != nil || todoIDStr == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
 	}
 
 	userID := GetUserIdFromToken(c)
 	if userID == -1 {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Server can't process request"})
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "This server can't process this request"})
 	}
 
 	rowsAffected, err := app.todos.DeleteTodoByID(todoID, userID)
@@ -187,11 +187,11 @@ func (app *application) DeleteTodo(c echo.Context) error {
 	})
 }
 
-// Add a tag to a todo
 func (app *application) AddTagToTodo(c echo.Context) error {
-	todoID, err := strconv.Atoi(c.Param("todo_id"))
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid todo ID"})
+	todoIDStr := c.QueryParam("todo_id")
+	todoID, err := strconv.Atoi(todoIDStr)
+	if err != nil || todoIDStr == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
 	}
 
 	tagID, err := strconv.Atoi(c.Param("tag_id"))
@@ -210,8 +210,30 @@ func (app *application) AddTagToTodo(c echo.Context) error {
 	})
 }
 
+func (app *application) AddNewTag(c echo.Context) error {
+	userID := GetUserIdFromToken(c)
+	if userID == -1 {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "This server can't process this request"})
+	}
+
+	tagName := c.QueryParam("tag_name")
+	cleanedTagName := CleanStringRegex(tagName)
+	if cleanedTagName == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "tags must contain a nonempty value"})
+	}
+
+	tagId, err := app.todos.AddTag(cleanedTagName)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"message": "Tag added successfully",
+		"tag_id":  tagId,
+	})
+}
+
 func createJwtToken(userID int, username string) (string, error) {
-	// Set custom claims
 	claims := &jwtCustomClaims{
 		Sub:   fmt.Sprintf("%d", userID),
 		Name:  username,
@@ -222,11 +244,8 @@ func createJwtToken(userID int, username string) (string, error) {
 		},
 	}
 
-	// Create token with claims
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
 	signingKey := os.Getenv("SigningKey")
-
 	tokenString, err := token.SignedString([]byte(signingKey))
 	if err != nil {
 		return "", err
@@ -249,4 +268,10 @@ func GetUserIdFromToken(c echo.Context) int {
 	}
 
 	return int(userId)
+}
+
+// Alternative implementation using regex
+func CleanStringRegex(input string) string {
+	reg := regexp.MustCompile("[^a-zA-Z0-9]+")
+	return reg.ReplaceAllString(strings.TrimSpace(input), "")
 }

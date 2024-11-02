@@ -20,7 +20,8 @@ CREATE TABLE todos (
 
 CREATE TABLE tags (
     tag_id SERIAL PRIMARY KEY,
-    name VARCHAR(50) NOT NULL
+    name VARCHAR(50) NOT NULL,
+    CONSTRAINT unique_tag_name UNIQUE (name)
 );
 
 CREATE TABLE todo_tags (

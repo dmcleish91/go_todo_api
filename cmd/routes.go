@@ -45,7 +45,11 @@ func (app *application) Routes() *echo.Echo {
 
 	secured.GET("/todos", app.GetTodosByUserID)
 
-	secured.POST("/todos", app.AddTodo)
+	secured.POST("/todos", app.AddNewTodo)
+
+	secured.POST("/tag", app.AddNewTag)
+
+	secured.POST("/addTodoTag", app.AddNewTodo)
 
 	secured.POST("/toggleComplete", app.ToggleTodoCompleted)
 

@@ -49,11 +49,11 @@ func (app *application) Routes() *echo.Echo {
 
 	secured.POST("/tag", app.AddNewTag)
 
-	secured.POST("/addTodoTag", app.AddNewTodo)
+	secured.POST("/addTodoTag", app.AddTagToTodo)
 
 	secured.POST("/toggleComplete", app.ToggleTodoCompleted)
 
-	secured.DELETE("deleteTodo", app.DeleteTodo)
+	secured.DELETE("/todos", app.DeleteTodo)
 
 	return e
 }

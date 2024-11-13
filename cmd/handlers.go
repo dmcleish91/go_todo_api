@@ -109,6 +109,10 @@ func (app *application) AddNewTodo(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
 	}
 
+	if todo.Title == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
+	}
+
 	userID := GetUserIdFromToken(c)
 	if userID == -1 {
 		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "This server can't process this request"})
@@ -188,13 +192,19 @@ func (app *application) DeleteTodo(c echo.Context) error {
 }
 
 func (app *application) AddTagToTodo(c echo.Context) error {
+	userID := GetUserIdFromToken(c)
+	if userID == -1 {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "This server can't process this request"})
+	}
+
 	todoIDStr := c.QueryParam("todo_id")
 	todoID, err := strconv.Atoi(todoIDStr)
 	if err != nil || todoIDStr == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
 	}
 
-	tagID, err := strconv.Atoi(c.Param("tag_id"))
+	tagIDstr := c.QueryParam("tag_id")
+	tagID, err := strconv.Atoi(tagIDstr)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid tag ID"})
 	}

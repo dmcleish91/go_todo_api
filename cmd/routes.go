@@ -27,6 +27,8 @@ func (app *application) Routes() *echo.Echo {
 		Format: `[${time_rfc3339} ${status} ${method} ${host}${path} ${latency_human}]` + "\n",
 	}))
 
+	e.Use(middleware.CORS())
+
 	secured := e.Group("/v1")
 
 	config := echojwt.Config{

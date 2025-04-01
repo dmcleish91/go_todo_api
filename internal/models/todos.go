@@ -26,15 +26,16 @@ type TodoModel struct {
 }
 
 // Add a new todo
-func (m *TodoModel) AddTodo(todo Todo) (int64, error) {
-	query := "INSERT INTO todos (user_id, title, description, due_date) VALUES ($1, $2, $3, $4)"
+func (m *TodoModel) AddTodo(todo Todo) (int, error) {
+	query := "INSERT INTO todos (user_id, title, description, due_date) VALUES ($1, $2, $3, $4) RETURNING todo_id"
 
-	result, err := m.DB.Exec(context.Background(), query, todo.UserID, todo.Title, todo.Description, todo.DueDate)
+	var todoID int
+	err := m.DB.QueryRow(context.Background(), query, todo.UserID, todo.Title, todo.Description, todo.DueDate).Scan(&todoID)
 	if err != nil {
 		return 0, fmt.Errorf("unable to execute query: %v", err)
 	}
 
-	return result.RowsAffected(), nil
+	return todoID, nil
 }
 
 // Get list of todos for a specific user

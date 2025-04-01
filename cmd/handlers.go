@@ -120,14 +120,14 @@ func (app *application) AddNewTodo(c echo.Context) error {
 
 	todo.UserID = userID
 
-	rowsAffected, err := app.todos.AddTodo(todo)
+	todoID, err := app.todos.AddTodo(todo)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
 
 	return c.JSON(http.StatusCreated, map[string]interface{}{
-		"message":       "Todo added successfully",
-		"rows_affected": rowsAffected,
+		"message": "Todo added successfully",
+		"todo ID": todoID,
 	})
 }
 

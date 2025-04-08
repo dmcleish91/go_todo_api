@@ -78,12 +78,12 @@ func (m *TodoModel) EditTodoByID(todo Todo) (Todo, error) {
 		todo.Description,
 		todo.DueDate,
 	).Scan(
-		updatedTodo.ID,
-		updatedTodo.Title,
-		updatedTodo.Description,
-		updatedTodo.DueDate,
-		updatedTodo.IsCompleted,
-		updatedTodo.UpdatedAt,
+		&updatedTodo.ID,
+		&updatedTodo.Title,
+		&updatedTodo.Description,
+		&updatedTodo.DueDate,
+		&updatedTodo.IsCompleted,
+		&updatedTodo.UpdatedAt,
 	)
 
 	if err != nil {

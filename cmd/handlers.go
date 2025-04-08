@@ -144,14 +144,14 @@ func (app *application) EditExistingTodo(c echo.Context) error {
 	}
 	todo.UserID = userId
 
-	rowsAffected, err := app.todos.EditTodoByID(todo)
+	result, err := app.todos.EditTodoByID(todo)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"message":       "Todo updated successfully",
-		"rows_affected": rowsAffected,
+		"data": result,
 	})
 }
 

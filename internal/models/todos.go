@@ -57,7 +57,7 @@ func (m *TodoModel) AddTodo(todo Todo) (Todo, error) {
 	return createdTodo, nil
 }
 
-func (m *TodoModel) EditTodoByID(todo Todo, userID int) (Todo, error) {
+func (m *TodoModel) EditTodoByID(todo Todo) (Todo, error) {
 	query := `
 	UPDATE todos 
 	SET title = $3,
@@ -73,7 +73,7 @@ func (m *TodoModel) EditTodoByID(todo Todo, userID int) (Todo, error) {
 		context.Background(),
 		query,
 		todo.ID,
-		userID,
+		todo.UserID,
 		todo.Title,
 		todo.Description,
 		todo.DueDate,

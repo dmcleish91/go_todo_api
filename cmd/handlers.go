@@ -142,17 +142,9 @@ func (app *application) EditExistingTodo(c echo.Context) error {
 	if todo.Title == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
 	}
-
-	todoIDStr := c.Param("todo_id")
-	todoID, err := strconv.Atoi(todoIDStr)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid todo ID"})
-	}
-
-	todo.ID = todoID
 	todo.UserID = userId
 
-	rowsAffected, err := app.todos.EditTodoByID(todo, userId)
+	rowsAffected, err := app.todos.EditTodoByID(todo)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}

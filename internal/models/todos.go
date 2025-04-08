@@ -25,7 +25,6 @@ type TodoModel struct {
 	DB *pgxpool.Pool
 }
 
-
 func (m *TodoModel) AddTodo(todo Todo) (Todo, error) {
 	query := `
 			INSERT INTO todos (user_id, title, description, due_date) 
@@ -58,6 +57,41 @@ func (m *TodoModel) AddTodo(todo Todo) (Todo, error) {
 	return createdTodo, nil
 }
 
+func (m *TodoModel) EditTodoByID(todo Todo, userID int) (Todo, error) {
+	query := `
+	UPDATE todos 
+	SET title = $3,
+    	description = $4,
+    	due_date = $5,
+    	updated_at = CURRENT_TIMESTAMP
+	WHERE todo_id = $1 
+	AND user_id = $2
+	RETURNING todo_id, title, description, due_date, is_completed, updated_at`
+
+	var updatedTodo Todo
+	err := m.DB.QueryRow(
+		context.Background(),
+		query,
+		todo.ID,
+		userID,
+		todo.Title,
+		todo.Description,
+		todo.DueDate,
+	).Scan(
+		updatedTodo.ID,
+		updatedTodo.Title,
+		updatedTodo.Description,
+		updatedTodo.DueDate,
+		updatedTodo.IsCompleted,
+		updatedTodo.UpdatedAt,
+	)
+
+	if err != nil {
+		return Todo{}, fmt.Errorf("unable to execute query: %v", err)
+	}
+
+	return updatedTodo, nil
+}
 
 func (m *TodoModel) GetTodosByUserID(userID int) ([]Todo, error) {
 	query := `
@@ -98,7 +132,6 @@ func (m *TodoModel) GetTodosByUserID(userID int) ([]Todo, error) {
 	return todos, nil
 }
 
-
 func (m *TodoModel) ToggleTodoCompleted(todoID int, userID int) (int64, error) {
 	query := "UPDATE todos SET is_completed = NOT is_completed, updated_at = CURRENT_TIMESTAMP WHERE todo_id = $1 AND user_id = $2"
 
@@ -109,7 +142,6 @@ func (m *TodoModel) ToggleTodoCompleted(todoID int, userID int) (int64, error) {
 
 	return result.RowsAffected(), nil
 }
-
 
 func (m *TodoModel) DeleteTodoByID(todoID int, userID int) (int64, error) {
 	query := "DELETE FROM todos WHERE todo_id = $1 AND user_id = $2"
@@ -122,7 +154,6 @@ func (m *TodoModel) DeleteTodoByID(todoID int, userID int) (int64, error) {
 	return result.RowsAffected(), nil
 }
 
-
 func (m *TodoModel) AddTagToTodo(todoID int, tagID int) (int64, error) {
 	query := "INSERT INTO todo_tags (todo_id, tag_id) VALUES ($1, $2)"
 
@@ -133,7 +164,6 @@ func (m *TodoModel) AddTagToTodo(todoID int, tagID int) (int64, error) {
 
 	return result.RowsAffected(), nil
 }
-
 
 func (m *TodoModel) AddTag(name string) (int, error) {
 	query := "INSERT INTO tags (name) VALUES ($1) RETURNING tag_id"

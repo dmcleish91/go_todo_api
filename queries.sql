@@ -69,6 +69,16 @@ ORDER BY
 INSERT INTO todos (user_id, title, description, due_date) 
 VALUES ($1, $2, $3, $4);
 
+-- Edit an existing todo
+UPDATE todos 
+SET title = $3,
+    description = $4,
+    due_date = $5,
+    updated_at = CURRENT_TIMESTAMP
+WHERE todo_id = $1 
+AND user_id = $2
+RETURNING todo_id, title, description, due_date, is_completed, updated_at;
+
 -- Mark a todo as complete
 UPDATE todos 
 SET is_completed = TRUE, updated_at = CURRENT_TIMESTAMP 

@@ -49,6 +49,8 @@ func (app *application) Routes() *echo.Echo {
 
 	secured.POST("/todos", app.AddNewTodo)
 
+	secured.POST("/editTodo", app.EditExistingTodo)
+
 	secured.POST("/tag", app.AddNewTag)
 
 	secured.POST("/addTodoTag", app.AddTagToTodo)

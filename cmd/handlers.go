@@ -131,6 +131,38 @@ func (app *application) AddNewTodo(c echo.Context) error {
 	})
 }
 
+// Edit a existing todo
+func (app *application) EditExistingTodo(c echo.Context) error {
+	userId := GetUserIdFromToken(c)
+	var todo models.Todo
+	if err := c.Bind(&todo); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
+	}
+
+	if todo.Title == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
+	}
+
+	todoIDStr := c.Param("todo_id")
+	todoID, err := strconv.Atoi(todoIDStr)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid todo ID"})
+	}
+
+	todo.ID = todoID
+	todo.UserID = userId
+
+	rowsAffected, err := app.todos.EditTodoByID(todo, userId)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"message":       "Todo updated successfully",
+		"rows_affected": rowsAffected,
+	})
+}
+
 func (app *application) GetTodosByUserID(c echo.Context) error {
 	userID := GetUserIdFromToken(c)
 	if userID == -1 {
@@ -268,8 +300,6 @@ func GetUserIdFromToken(c echo.Context) int {
 	token := c.Get("user").(*jwt.Token)
 	claims := token.Claims.(*jwtCustomClaims)
 	userIdStr := claims.Sub
-
-	log.Println("Decoded user id is", userIdStr)
 
 	userId, err := strconv.ParseInt(userIdStr, 10, 64)
 	if err != nil {

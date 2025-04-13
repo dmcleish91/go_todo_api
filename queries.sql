@@ -32,6 +32,17 @@ CREATE TABLE todo_tags (
     FOREIGN KEY (tag_id) REFERENCES tags(tag_id) ON DELETE CASCADE
 );
 
+CREATE TABLE refresh_tokens (
+    token_id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL,
+    token VARCHAR(255) NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+-- Add index for faster token lookups
+CREATE INDEX idx_refresh_token ON refresh_tokens(token);
 
 -- Signup: Insert a new user
 INSERT INTO users (username, email, password_hash) 

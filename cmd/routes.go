@@ -45,6 +45,8 @@ func (app *application) Routes() *echo.Echo {
 
 	e.POST("/login", app.Login)
 
+	secured.POST("/logout", app.Logout)
+
 	secured.GET("/todos", app.GetTodosByUserID)
 
 	secured.POST("/todos", app.AddNewTodo)

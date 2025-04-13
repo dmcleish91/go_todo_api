@@ -86,34 +86,65 @@ func (app *application) Login(ctx echo.Context) error {
 		return ctx.String(http.StatusInternalServerError, "Error creating refresh token")
 	}
 
+	cookie := new(http.Cookie)
+	cookie.Name = "refresh_token"
+	cookie.Value = refreshToken
+	cookie.Expires = refreshExpiry
+	cookie.HttpOnly = true
+	cookie.Secure = true
+	cookie.Path = "/v1/refresh-token"
+	cookie.SameSite = http.SameSiteStrictMode
+	ctx.SetCookie(cookie)
+
 	return ctx.JSON(http.StatusOK, map[string]any{
 		"ok": true,
 		"data": map[string]any{
-			"access_token":  accessToken,
-			"refresh_token": refreshToken,
-			"token_type":    "Bearer",
-			"expires_in":    3600,
+			"access_token": accessToken,
+			"token_type":   "Bearer",
+			"expires_in":   3600,
 		},
 	})
 }
 
+func (app *application) Logout(c echo.Context) error {
+	c.SetCookie(&http.Cookie{
+		Name:     "refresh_token",
+		Value:    "",
+		HttpOnly: true,
+		Expires:  time.Now().Add(-1 * time.Hour),
+		Path:     "/v1/refresh-token",
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+	})
+
+	return c.JSON(http.StatusOK, map[string]string{
+		"message": "Successfully logged out",
+	})
+}
+
 func (app *application) RefreshToken(c echo.Context) error {
-	refreshToken := c.FormValue("refresh_token")
-	if refreshToken == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Refresh token is required",
+	cookie, err := c.Cookie("refresh_token")
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]string{
+			"error": "Refresh token cookie not found",
 		})
 	}
+	refreshToken := cookie.Value
 
-	// Validate refresh token
 	tokenData, err := app.refreshTokens.ValidateRefreshToken(refreshToken)
 	if err != nil {
+		c.SetCookie(&http.Cookie{
+			Name:     "refresh_token",
+			Value:    "",
+			HttpOnly: true,
+			Expires:  time.Now().Add(-1 * time.Hour),
+			Path:     "/v1/refresh-token",
+		})
 		return c.JSON(http.StatusUnauthorized, map[string]string{
 			"error": "Invalid refresh token",
 		})
 	}
 
-	// Get user details
 	user, err := app.users.GetUserByID(tokenData.UserID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
@@ -121,7 +152,6 @@ func (app *application) RefreshToken(c echo.Context) error {
 		})
 	}
 
-	// Generate new access token
 	newAccessToken, err := createJwtToken(user.ID, user.Username)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
@@ -134,11 +164,11 @@ func (app *application) RefreshToken(c echo.Context) error {
 		"data": map[string]any{
 			"access_token": newAccessToken,
 			"token_type":   "Bearer",
-			"expires_in":   3600},
+			"expires_in":   3600,
+		},
 	})
 }
 
-// Update user email
 func (app *application) UpdateUserEmail(c echo.Context) error {
 	type UpdateEmailInput struct {
 		NewEmail string `json:"new_email"`
@@ -161,7 +191,6 @@ func (app *application) UpdateUserEmail(c echo.Context) error {
 	})
 }
 
-// Add a new todo
 func (app *application) AddNewTodo(c echo.Context) error {
 	var todo models.Todo
 	if err := c.Bind(&todo); err != nil {
@@ -190,7 +219,6 @@ func (app *application) AddNewTodo(c echo.Context) error {
 	})
 }
 
-// Edit a existing todo
 func (app *application) EditExistingTodo(c echo.Context) error {
 	userId := GetUserIdFromToken(c)
 	var todo models.Todo

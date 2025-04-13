@@ -57,6 +57,8 @@ func (app *application) Routes() *echo.Echo {
 
 	secured.POST("/toggleComplete", app.ToggleTodoCompleted)
 
+	secured.POST("/refresh-token", app.RefreshToken)
+
 	secured.DELETE("/todos", app.DeleteTodo)
 
 	return e

@@ -9,8 +9,9 @@ import (
 )
 
 type application struct {
-	users *models.UserModel
-	todos *models.TodoModel
+	users         *models.UserModel
+	todos         *models.TodoModel
+	refreshTokens *models.RefreshTokenModel
 }
 
 func main() {
@@ -27,8 +28,9 @@ func main() {
 	defer conn.Close()
 
 	app := &application{
-		users: &models.UserModel{DB: conn},
-		todos: &models.TodoModel{DB: conn},
+		users:         &models.UserModel{DB: conn},
+		todos:         &models.TodoModel{DB: conn},
+		refreshTokens: &models.RefreshTokenModel{DB: conn},
 	}
 
 	e := app.Routes()

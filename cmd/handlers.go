@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/rand"
 	"crypto/subtle"
+	"encoding/base64"
 	"fmt"
 	"log"
 	"net/http"
@@ -55,7 +57,7 @@ func (app *application) Login(ctx echo.Context) error {
 	user, err := app.users.GetUserByEmail(email)
 	if err != nil {
 		log.Printf("Error: %s", err)
-		return ctx.String(http.StatusInternalServerError, "Something went wrong")
+		return ctx.String(http.StatusInternalServerError, "Error retriving user from database")
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
@@ -67,15 +69,72 @@ func (app *application) Login(ctx echo.Context) error {
 		return ctx.String(http.StatusUnauthorized, "email or password was incorrect")
 	}
 
-	token, err := createJwtToken(user.ID, user.Username)
+	accessToken, err := createJwtToken(user.ID, user.Username)
 	if err != nil {
 		log.Println("Error Creating JWT token")
-		return ctx.String(http.StatusInternalServerError, "Something went wrong")
+		return ctx.String(http.StatusInternalServerError, "Error create access token")
 	}
 
-	return ctx.JSON(http.StatusOK, map[string]string{
-		"message": "You were logged in!",
-		"token":   token,
+	refreshToken, err := generateSecureToken()
+	if err != nil {
+		return ctx.String(http.StatusInternalServerError, "Error generating refresh token string")
+	}
+	refreshExpiry := time.Now().Add(time.Hour * 24 * 7)
+
+	err = app.refreshTokens.CreateRefreshToken(user.ID, refreshToken, refreshExpiry)
+	if err != nil {
+		return ctx.String(http.StatusInternalServerError, "Error creating refresh token")
+	}
+
+	return ctx.JSON(http.StatusOK, map[string]any{
+		"ok": true,
+		"data": map[string]any{
+			"access_token":  accessToken,
+			"refresh_token": refreshToken,
+			"token_type":    "Bearer",
+			"expires_in":    3600,
+		},
+	})
+}
+
+func (app *application) RefreshToken(c echo.Context) error {
+	refreshToken := c.FormValue("refresh_token")
+	if refreshToken == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Refresh token is required",
+		})
+	}
+
+	// Validate refresh token
+	tokenData, err := app.refreshTokens.ValidateRefreshToken(refreshToken)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]string{
+			"error": "Invalid refresh token",
+		})
+	}
+
+	// Get user details
+	user, err := app.users.GetUserByID(tokenData.UserID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Error fetching user details",
+		})
+	}
+
+	// Generate new access token
+	newAccessToken, err := createJwtToken(user.ID, user.Username)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Error generating new access token",
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]any{
+		"ok": true,
+		"data": map[string]any{
+			"access_token": newAccessToken,
+			"token_type":   "Bearer",
+			"expires_in":   3600},
 	})
 }
 
@@ -150,8 +209,8 @@ func (app *application) EditExistingTodo(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"message":       "Todo updated successfully",
-		"data": result,
+		"message": "Todo updated successfully",
+		"data":    result,
 	})
 }
 
@@ -273,7 +332,7 @@ func createJwtToken(userID int, username string) (string, error) {
 		Name:  username,
 		Admin: false,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 72)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 1)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
@@ -286,6 +345,20 @@ func createJwtToken(userID int, username string) (string, error) {
 	}
 
 	return tokenString, nil
+}
+
+func generateSecureToken() (string, error) {
+	// Generate 32 random bytes (256 bits)
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", fmt.Errorf("failed to generate random bytes: %v", err)
+	}
+
+	// Encode bytes to base64URL (URL-safe version of base64)
+	// We use RawURLEncoding to avoid padding characters
+	token := base64.RawURLEncoding.EncodeToString(bytes)
+
+	return token, nil
 }
 
 func GetUserIdFromToken(c echo.Context) int {

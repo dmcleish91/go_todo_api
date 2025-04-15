@@ -91,9 +91,9 @@ func (app *application) Login(ctx echo.Context) error {
 	cookie.Value = refreshToken
 	cookie.Expires = refreshExpiry
 	cookie.HttpOnly = true
-	cookie.Secure = true
+	cookie.Secure = false
 	cookie.Path = "/v1/refresh-token"
-	cookie.SameSite = http.SameSiteStrictMode
+	cookie.SameSite = http.SameSiteLaxMode
 	ctx.SetCookie(cookie)
 
 	return ctx.JSON(http.StatusOK, map[string]any{

@@ -93,7 +93,7 @@ func (app *application) Login(ctx echo.Context) error {
 	cookie.HttpOnly = true
 	cookie.Secure = false
 	cookie.Path = "/v1/refresh-token"
-	cookie.SameSite = http.SameSiteLaxMode
+	//cookie.SameSite = http.SameSiteDefaultMode
 	ctx.SetCookie(cookie)
 
 	return ctx.JSON(http.StatusOK, map[string]any{

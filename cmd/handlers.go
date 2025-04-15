@@ -92,7 +92,7 @@ func (app *application) Login(ctx echo.Context) error {
 	cookie.Expires = refreshExpiry
 	cookie.HttpOnly = true
 	cookie.Secure = false
-	cookie.Path = "/v1/refresh-token"
+	//cookie.Path = "/v1/refresh-token"
 	//cookie.SameSite = http.SameSiteDefaultMode
 	ctx.SetCookie(cookie)
 

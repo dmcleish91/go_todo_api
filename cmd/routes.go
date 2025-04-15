@@ -50,6 +50,8 @@ func (app *application) Routes() *echo.Echo {
 
 	e.POST("/login", app.Login)
 
+	e.POST("/refresh-token", app.RefreshToken)
+
 	secured.POST("/logout", app.Logout)
 
 	secured.GET("/todos", app.GetTodosByUserID)
@@ -63,8 +65,6 @@ func (app *application) Routes() *echo.Echo {
 	secured.POST("/addTodoTag", app.AddTagToTodo)
 
 	secured.POST("/toggleComplete", app.ToggleTodoCompleted)
-
-	secured.POST("/refresh-token", app.RefreshToken)
 
 	secured.DELETE("/todos", app.DeleteTodo)
 

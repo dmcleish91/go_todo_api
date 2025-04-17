@@ -215,9 +215,9 @@ func (app *application) AddNewTodo(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
 
-	return c.JSON(http.StatusCreated, map[string]interface{}{
+	return c.JSON(http.StatusCreated, map[string]any{
 		"message": "Todo added successfully",
-		"todo ID": todoID,
+		"data":    todoID,
 	})
 }
 
@@ -238,7 +238,7 @@ func (app *application) EditExistingTodo(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
 
-	return c.JSON(http.StatusOK, map[string]interface{}{
+	return c.JSON(http.StatusOK, map[string]any{
 		"message": "Todo updated successfully",
 		"data":    result,
 	})

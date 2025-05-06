@@ -52,7 +52,7 @@ func (app *application) Routes() *echo.Echo {
 
 	e.POST("/refresh-token", app.RefreshToken)
 
-	secured.POST("/logout", app.Logout)
+	e.POST("/logout", app.Logout)
 
 	secured.GET("/todos", app.GetTodosByUserID)
 

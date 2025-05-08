@@ -115,8 +115,8 @@ func (app *application) Logout(c echo.Context) error {
 		HttpOnly: true,
 		Expires:  time.Now().Add(-1 * time.Hour),
 		//Path:     "/v1/refresh-token",
-		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
+		Secure: false,
+		//SameSite: http.SameSiteStrictMode,
 	})
 
 	return c.JSON(http.StatusOK, map[string]string{

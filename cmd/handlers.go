@@ -114,7 +114,7 @@ func (app *application) Logout(c echo.Context) error {
 		Value:    "",
 		HttpOnly: true,
 		Expires:  time.Now().Add(-1 * time.Hour),
-		Path:     "/v1/refresh-token",
+		//Path:     "/v1/refresh-token",
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
 	})

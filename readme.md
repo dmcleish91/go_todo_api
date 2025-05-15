@@ -12,6 +12,7 @@ go build -o todoapi.exe .\cmd\ && .\todoapi.exe
    DB_USER=yourusername
    DB_PASSWORD=yourpassword
    DB_NAME=tododb
+   OPENAI_API_KEY=your_openai_api_key
    ```
 
 # Running the application
@@ -25,3 +26,22 @@ go build -o todoapi.exe .\cmd\ && .\todoapi.exe
    ```
    .\todoapi.exe
    ```
+
+## Suggesting a Better Todo Title
+
+To get an improved version of a todo title, use:
+
+```bash
+curl -X POST http://localhost:1323/suggest-title \
+  -H "Content-Type: application/json" \
+  -d '{"title": "your todo title here"}'
+```
+
+Response:
+```json
+{
+  "suggested_title": "Improved and clearer title"
+}
+```
+
+Requires `OPENAI_API_KEY` to be set in your `.env` file.

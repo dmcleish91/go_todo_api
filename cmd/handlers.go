@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -354,6 +357,76 @@ func (app *application) AddNewTag(c echo.Context) error {
 		"message": "Tag added successfully",
 		"tag_id":  tagId,
 	})
+}
+
+type SuggestTitleRequest struct {
+	Title string `json:"title"`
+}
+
+type OpenAIRequest struct {
+	Model string `json:"model"`
+	Input string `json:"input"`
+}
+
+// Replace your OpenAIResponse struct with:
+type OpenAIResponse struct {
+    Output []struct {
+        Content []struct {
+            Text string `json:"text"`
+        } `json:"content"`
+    } `json:"output"`
+}
+
+// Update your SuggestTodoTitle function's extraction logic:
+func (app *application) SuggestTodoTitle(c echo.Context) error {
+    var req SuggestTitleRequest
+    if err := c.Bind(&req); err != nil || strings.TrimSpace(req.Title) == "" {
+        return c.JSON(http.StatusBadRequest, map[string]string{"error": "Missing or invalid title"})
+    }
+
+    apiKey := os.Getenv("OPENAI_API_KEY")
+    if apiKey == "" {
+        return c.JSON(http.StatusInternalServerError, map[string]string{"error": "OpenAI API key not set"})
+    }
+
+    openaiReq := OpenAIRequest{
+        Model: "gpt-4.1",
+        Input: "Improve the clarity, spelling, and formatting of this todo item title: " + req.Title,
+    }
+    body, _ := json.Marshal(openaiReq)
+
+    httpReq, err := http.NewRequest("POST", "https://api.openai.com/v1/responses", bytes.NewBuffer(body))
+    if err != nil {
+        return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to create request"})
+    }
+    httpReq.Header.Set("Content-Type", "application/json")
+    httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+
+    resp, err := http.DefaultClient.Do(httpReq)
+    if err != nil {
+        return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to call OpenAI API"})
+    }
+    defer resp.Body.Close()
+
+    respBody, _ := io.ReadAll(resp.Body)
+    fmt.Println("OpenAI API response:", string(respBody))
+
+    var openaiResp OpenAIResponse
+    if err := json.Unmarshal(respBody, &openaiResp); err != nil {
+        return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to parse OpenAI response"})
+    }
+
+    // Extract the improved title from the new structure
+    suggestion := req.Title // fallback
+    if len(openaiResp.Output) > 0 && len(openaiResp.Output[0].Content) > 0 {
+        if openaiResp.Output[0].Content[0].Text != "" {
+            suggestion = openaiResp.Output[0].Content[0].Text
+        }
+    }
+
+    return c.JSON(http.StatusOK, map[string]string{
+        "suggested_title": suggestion,
+    })
 }
 
 func createJwtToken(userID int, username string) (string, error) {

@@ -11,7 +11,7 @@ import (
 
 type Todo struct {
 	ID          int        `json:"todo_id"`
-	UserID      int        `json:"user_id"`
+	UserID      string     `json:"user_id"`
 	Title       string     `json:"title"`
 	Description string     `json:"description"`
 	IsCompleted bool       `json:"is_completed"`
@@ -93,7 +93,7 @@ func (m *TodoModel) EditTodoByID(todo Todo) (Todo, error) {
 	return updatedTodo, nil
 }
 
-func (m *TodoModel) GetTodosByUserID(userID int) ([]Todo, error) {
+func (m *TodoModel) GetTodosByUserID(userID string) ([]Todo, error) {
 	query := `
     SELECT 
         t.todo_id, t.user_id, t.title, t.description, t.is_completed, t.due_date, t.created_at, t.updated_at, 
@@ -132,7 +132,7 @@ func (m *TodoModel) GetTodosByUserID(userID int) ([]Todo, error) {
 	return todos, nil
 }
 
-func (m *TodoModel) ToggleTodoCompleted(todoID int, userID int) (int64, error) {
+func (m *TodoModel) ToggleTodoCompleted(todoID int, userID string) (int64, error) {
 	query := "UPDATE todos SET is_completed = NOT is_completed, updated_at = CURRENT_TIMESTAMP WHERE todo_id = $1 AND user_id = $2"
 
 	result, err := m.DB.Exec(context.Background(), query, todoID, userID)
@@ -143,7 +143,7 @@ func (m *TodoModel) ToggleTodoCompleted(todoID int, userID int) (int64, error) {
 	return result.RowsAffected(), nil
 }
 
-func (m *TodoModel) DeleteTodoByID(todoID int, userID int) (int64, error) {
+func (m *TodoModel) DeleteTodoByID(todoID int, userID string) (int64, error) {
 	query := "DELETE FROM todos WHERE todo_id = $1 AND user_id = $2"
 
 	result, err := m.DB.Exec(context.Background(), query, todoID, userID)

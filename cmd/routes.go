@@ -1,11 +1,7 @@
 package main
 
 import (
-	"crypto/rsa"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
-	"math/big"
 	"net/http"
 	"os"
 	"strings"
@@ -20,18 +16,6 @@ type SupabaseJWTClaims struct {
 	Email string `json:"email"` // User email
 	Role  string `json:"role"`  // User role
 	jwt.RegisteredClaims
-}
-
-type JWK struct {
-	Kty string `json:"kty"`
-	Use string `json:"use"`
-	Kid string `json:"kid"`
-	N   string `json:"n"`
-	E   string `json:"e"`
-}
-
-type JWKS struct {
-	Keys []JWK `json:"keys"`
 }
 
 func (app *application) Routes() *echo.Echo {
@@ -84,10 +68,27 @@ func (app *application) SupabaseJWTMiddleware() echo.MiddlewareFunc {
 				return echo.NewHTTPError(http.StatusUnauthorized, "invalid authorization header format")
 			}
 
-			// Verify Supabase JWT
-			claims, err := app.verifySupabaseJWT(tokenString)
+			signingKey := os.Getenv("SUPABASE_JWT_SIGNINGKEY")
+			if signingKey == "" {
+				return echo.NewHTTPError(http.StatusInternalServerError, "SUPABASE_JWT_SIGNINGKEY not set")
+			}
+
+			// Parse and validate the token
+			claims := &SupabaseJWTClaims{}
+			token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (any, error) {
+				// Verify the signing method
+				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+				}
+				return []byte(signingKey), nil
+			})
+
 			if err != nil {
 				return echo.NewHTTPError(http.StatusUnauthorized, "invalid token: "+err.Error())
+			}
+
+			if !token.Valid {
+				return echo.NewHTTPError(http.StatusUnauthorized, "invalid token")
 			}
 
 			// Add user info to context
@@ -98,87 +99,6 @@ func (app *application) SupabaseJWTMiddleware() echo.MiddlewareFunc {
 			return next(c)
 		}
 	}
-}
-
-func (app *application) verifySupabaseJWT(tokenString string) (*SupabaseJWTClaims, error) {
-	supabaseURL := os.Getenv("SUPABASE_URL")
-	if supabaseURL == "" {
-		return nil, fmt.Errorf("SUPABASE_URL not set")
-	}
-
-	token, _, err := new(jwt.Parser).ParseUnverified(tokenString, &SupabaseJWTClaims{})
-	if err != nil {
-		return nil, err
-	}
-
-	kid, ok := token.Header["kid"].(string)
-	if !ok {
-		return nil, fmt.Errorf("kid not found in token header")
-	}
-
-	publicKey, err := app.getSupabasePublicKey(supabaseURL, kid)
-	if err != nil {
-		return nil, err
-	}
-
-	claims := &SupabaseJWTClaims{}
-	parsedToken, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-		return publicKey, nil
-	})
-
-	if err != nil || !parsedToken.Valid {
-		return nil, fmt.Errorf("invalid token")
-	}
-
-	return claims, nil
-}
-
-func (app *application) getSupabasePublicKey(supabaseURL, kid string) (*rsa.PublicKey, error) {
-	jwksURL := fmt.Sprintf("%s/auth/v1/jwks", supabaseURL)
-
-	resp, err := http.Get(jwksURL)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	var jwks JWKS
-	if err := json.NewDecoder(resp.Body).Decode(&jwks); err != nil {
-		return nil, err
-	}
-
-	for _, key := range jwks.Keys {
-		if key.Kid == kid {
-			return app.jwkToRSAPublicKey(key)
-		}
-	}
-
-	return nil, fmt.Errorf("key not found")
-}
-
-func (app *application) jwkToRSAPublicKey(jwk JWK) (*rsa.PublicKey, error) {
-	nBytes, err := base64.RawURLEncoding.DecodeString(jwk.N)
-	if err != nil {
-		return nil, err
-	}
-
-	eBytes, err := base64.RawURLEncoding.DecodeString(jwk.E)
-	if err != nil {
-		return nil, err
-	}
-
-	n := new(big.Int).SetBytes(nBytes)
-
-	var e int
-	if len(eBytes) == 3 {
-		e = int(eBytes[0])<<16 + int(eBytes[1])<<8 + int(eBytes[2])
-	} else if len(eBytes) == 1 {
-		e = int(eBytes[0])
-	} else {
-		return nil, fmt.Errorf("invalid exponent")
-	}
-
-	return &rsa.PublicKey{N: n, E: e}, nil
 }
 
 func GetUserID(c echo.Context) string {

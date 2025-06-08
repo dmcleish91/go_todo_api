@@ -143,35 +143,6 @@ func (app *application) DeleteTodo(c echo.Context) error {
 	})
 }
 
-func (app *application) AddTagToTodo(c echo.Context) error {
-	userID := GetUserID(c)
-	if userID == "" {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "This server can't process this request"})
-	}
-
-	todoIDStr := c.QueryParam("todo_id")
-	todoID, err := strconv.Atoi(todoIDStr)
-	if err != nil || todoIDStr == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
-	}
-
-	tagIDstr := c.QueryParam("tag_id")
-	tagID, err := strconv.Atoi(tagIDstr)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid tag ID"})
-	}
-
-	rowsAffected, err := app.todos.AddTagToTodo(todoID, tagID)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
-	}
-
-	return c.JSON(http.StatusOK, map[string]interface{}{
-		"message":       "Tag added successfully",
-		"rows_affected": rowsAffected,
-	})
-}
-
 func (app *application) AddNewTag(c echo.Context) error {
 	userID := GetUserID(c)
 	if userID == "" {

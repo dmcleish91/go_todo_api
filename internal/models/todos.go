@@ -3,7 +3,6 @@ package models
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -15,10 +14,10 @@ type Todo struct {
 	Title       string     `json:"title"`
 	Description string     `json:"description"`
 	IsCompleted bool       `json:"is_completed"`
-	DueDate     *time.Time `json:"due_date,omitempty"`
+	DueDate     *time.Time `json:"due_date"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
-	Tags        []string   `json:"tags,omitempty"`
+	Tags        []string   `json:"tags"`
 }
 
 type TodoModel struct {
@@ -27,9 +26,9 @@ type TodoModel struct {
 
 func (m *TodoModel) AddTodo(todo Todo) (Todo, error) {
 	query := `
-			INSERT INTO todos (user_id, title, description, due_date) 
-			VALUES ($1, $2, $3, $4) 
-			RETURNING todo_id, user_id, title, description, is_completed, due_date, created_at, updated_at`
+			INSERT INTO todos (user_id, title, description, due_date, tags) 
+			VALUES ($1, $2, $3, $4, $5) 
+			RETURNING todo_id, user_id, title, description, is_completed, due_date, created_at, updated_at, tags`
 
 	var createdTodo Todo
 	err := m.DB.QueryRow(
@@ -39,6 +38,7 @@ func (m *TodoModel) AddTodo(todo Todo) (Todo, error) {
 		todo.Title,
 		todo.Description,
 		todo.DueDate,
+		todo.Tags,
 	).Scan(
 		&createdTodo.ID,
 		&createdTodo.UserID,
@@ -48,6 +48,7 @@ func (m *TodoModel) AddTodo(todo Todo) (Todo, error) {
 		&createdTodo.DueDate,
 		&createdTodo.CreatedAt,
 		&createdTodo.UpdatedAt,
+		&createdTodo.Tags,
 	)
 
 	if err != nil {
@@ -63,10 +64,11 @@ func (m *TodoModel) EditTodoByID(todo Todo) (Todo, error) {
 	SET title = $3,
     	description = $4,
     	due_date = $5,
+		tags = $6,
     	updated_at = CURRENT_TIMESTAMP
 	WHERE todo_id = $1 
 	AND user_id = $2
-	RETURNING todo_id, title, description, due_date, is_completed, updated_at`
+	RETURNING todo_id, title, description, due_date, is_completed, updated_at, tags`
 
 	var updatedTodo Todo
 	err := m.DB.QueryRow(
@@ -77,6 +79,7 @@ func (m *TodoModel) EditTodoByID(todo Todo) (Todo, error) {
 		todo.Title,
 		todo.Description,
 		todo.DueDate,
+		todo.Tags,
 	).Scan(
 		&updatedTodo.ID,
 		&updatedTodo.Title,
@@ -84,6 +87,7 @@ func (m *TodoModel) EditTodoByID(todo Todo) (Todo, error) {
 		&updatedTodo.DueDate,
 		&updatedTodo.IsCompleted,
 		&updatedTodo.UpdatedAt,
+		&updatedTodo.Tags,
 	)
 
 	if err != nil {
@@ -96,14 +100,10 @@ func (m *TodoModel) EditTodoByID(todo Todo) (Todo, error) {
 func (m *TodoModel) GetTodosByUserID(userID string) ([]Todo, error) {
 	query := `
     SELECT 
-        t.todo_id, t.user_id, t.title, t.description, t.is_completed, t.due_date, t.created_at, t.updated_at, 
-        STRING_AGG(tag.name, ', ') AS tags
-    FROM todos t
-    LEFT JOIN todo_tags tt ON t.todo_id = tt.todo_id
-    LEFT JOIN tags tag ON tt.tag_id = tag.tag_id
-    WHERE t.user_id = $1
-    GROUP BY t.todo_id
-    ORDER BY t.created_at DESC`
+        todo_id, user_id, title, description, is_completed, due_date, created_at, updated_at, tags
+    FROM todos
+    WHERE user_id = $1
+    ORDER BY created_at DESC`
 
 	rows, err := m.DB.Query(context.Background(), query, userID)
 	if err != nil {
@@ -115,15 +115,19 @@ func (m *TodoModel) GetTodosByUserID(userID string) ([]Todo, error) {
 
 	for rows.Next() {
 		var todo Todo
-		var tags *string
-
-		err := rows.Scan(&todo.ID, &todo.UserID, &todo.Title, &todo.Description, &todo.IsCompleted, &todo.DueDate, &todo.CreatedAt, &todo.UpdatedAt, &tags)
+		err := rows.Scan(
+			&todo.ID,
+			&todo.UserID,
+			&todo.Title,
+			&todo.Description,
+			&todo.IsCompleted,
+			&todo.DueDate,
+			&todo.CreatedAt,
+			&todo.UpdatedAt,
+			&todo.Tags,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("unable to scan row: %v", err)
-		}
-
-		if tags != nil {
-			todo.Tags = splitTags(*tags) // Helper function to split tags string into slice
 		}
 
 		todos = append(todos, todo)
@@ -154,17 +158,6 @@ func (m *TodoModel) DeleteTodoByID(todoID int, userID string) (int64, error) {
 	return result.RowsAffected(), nil
 }
 
-func (m *TodoModel) AddTagToTodo(todoID int, tagID int) (int64, error) {
-	query := "INSERT INTO todo_tags (todo_id, tag_id) VALUES ($1, $2)"
-
-	result, err := m.DB.Exec(context.Background(), query, todoID, tagID)
-	if err != nil {
-		return 0, fmt.Errorf("unable to add tag: %v", err)
-	}
-
-	return result.RowsAffected(), nil
-}
-
 func (m *TodoModel) AddTag(name string) (int, error) {
 	query := "INSERT INTO tags (name) VALUES ($1) RETURNING tag_id"
 
@@ -175,12 +168,4 @@ func (m *TodoModel) AddTag(name string) (int, error) {
 	}
 
 	return tagID, nil
-}
-
-// Helper function to split the tags string into a slice
-func splitTags(tagString string) []string {
-	if tagString == "" {
-		return []string{}
-	}
-	return strings.Split(tagString, ", ")
 }

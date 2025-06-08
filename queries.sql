@@ -15,6 +15,7 @@ CREATE TABLE todos (
     due_date DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    tags TEXT[] DEFAULT ARRAY[]::TEXT[],
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
@@ -22,14 +23,6 @@ CREATE TABLE tags (
     tag_id SERIAL PRIMARY KEY,
     name VARCHAR(50) NOT NULL,
     CONSTRAINT unique_tag_name UNIQUE (name)
-);
-
-CREATE TABLE todo_tags (
-    todo_id INT NOT NULL,
-    tag_id INT NOT NULL,
-    PRIMARY KEY (todo_id, tag_id),
-    FOREIGN KEY (todo_id) REFERENCES todos(todo_id) ON DELETE CASCADE,
-    FOREIGN KEY (tag_id) REFERENCES tags(tag_id) ON DELETE CASCADE
 );
 
 CREATE TABLE refresh_tokens (
@@ -55,40 +48,32 @@ WHERE email = $1;
 
 -- Get list of todos for a specific user
 SELECT 
-    t.todo_id, 
-    t.title, 
-    t.description, 
-    t.is_completed, 
-    t.due_date, 
-    t.created_at, 
-    t.updated_at, 
-    STRING_AGG(tag.name, ', ') AS tags
-FROM 
-    todos t
-LEFT JOIN 
-    todo_tags tt ON t.todo_id = tt.todo_id
-LEFT JOIN 
-    tags tag ON tt.tag_id = tag.tag_id
-WHERE 
-    t.user_id = $1
-GROUP BY 
-    t.todo_id
-ORDER BY 
-    t.created_at DESC;
+    todo_id, 
+    title, 
+    description, 
+    is_completed, 
+    due_date, 
+    created_at, 
+    updated_at,
+    tags
+FROM todos
+WHERE user_id = $1
+ORDER BY created_at DESC;
 
 -- Add a new todo
-INSERT INTO todos (user_id, title, description, due_date) 
-VALUES ($1, $2, $3, $4);
+INSERT INTO todos (user_id, title, description, due_date, tags) 
+VALUES ($1, $2, $3, $4, $5);
 
 -- Edit an existing todo
 UPDATE todos 
 SET title = $3,
     description = $4,
     due_date = $5,
+    tags = $6,
     updated_at = CURRENT_TIMESTAMP
 WHERE todo_id = $1 
 AND user_id = $2
-RETURNING todo_id, title, description, due_date, is_completed, updated_at;
+RETURNING todo_id, title, description, due_date, is_completed, updated_at, tags;
 
 -- Mark a todo as complete
 UPDATE todos 
@@ -99,11 +84,7 @@ WHERE todo_id = $1 AND user_id = $2;
 DELETE FROM todos 
 WHERE todo_id = $1 AND user_id = $2;
 
--- Add a tag to an existing todo
-INSERT INTO todo_tags (todo_id, tag_id) 
-VALUES ($1, $2);
-
--- Add a new tag (if needed)
+-- Add a new tag preset (if needed)
 INSERT INTO tags (name) 
 VALUES ($1) 
 RETURNING tag_id;

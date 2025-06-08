@@ -2,6 +2,8 @@
 
 go build -o todoapi.exe .\cmd\ && .\todoapi.exe
 
+run the dev env with go run .\cmd\
+
 # Setting up secrets
 
 1. Create a `.env` file in the root directory of the project.

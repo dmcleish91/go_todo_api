@@ -28,7 +28,7 @@ func (app *application) Routes() *echo.Echo {
 	}))
 
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins:     []string{"http://localhost:5173", "https://yata-one.vercel.app"},
+		AllowOrigins:     []string{"http://localhost:5173", "https://yata-delta.vercel.app/"},
 		AllowMethods:     []string{echo.GET, echo.PUT, echo.POST, echo.DELETE},
 		AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization},
 		AllowCredentials: true,

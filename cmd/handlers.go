@@ -10,28 +10,6 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-func (app *application) UpdateUserEmail(c echo.Context) error {
-	type UpdateEmailInput struct {
-		NewEmail string `json:"new_email"`
-	}
-	email := c.Param("email")
-	var input UpdateEmailInput
-
-	if err := c.Bind(&input); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
-	}
-
-	rowsAffected, err := app.users.UpdateUserEmail(email, input.NewEmail)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
-	}
-
-	return c.JSON(http.StatusOK, map[string]interface{}{
-		"message":       "Email updated successfully",
-		"rows_affected": rowsAffected,
-	})
-}
-
 func (app *application) AddNewTodo(c echo.Context) error {
 	var todo models.Todo
 	if err := c.Bind(&todo); err != nil {

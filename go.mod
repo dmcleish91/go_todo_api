@@ -10,6 +10,8 @@ require (
 	github.com/labstack/echo/v4 v4.12.0
 )
 
+require github.com/google/uuid v1.6.0 // indirect
+
 require (
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect

@@ -16,8 +16,10 @@ func (app *application) AddNewTodo(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
 	}
 
-	if todo.Title == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
+	v := models.NewValidator()
+	models.ValidateTodo(&todo, v)
+	if !v.Valid() {
+		return c.JSON(http.StatusUnprocessableEntity, map[string]any{"errors": v.Errors})
 	}
 
 	userID := GetUserID(c)

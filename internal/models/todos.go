@@ -169,3 +169,10 @@ func (m *TodoModel) AddTag(name string) (int, error) {
 
 	return tagID, nil
 }
+
+func ValidateTodo(todo *Todo, v *Validator) {
+	v.Check(todo.Title != "", "title", "Title must not be empty")
+	if len(todo.Title) > 100 {
+		v.AddError("title", "Title must not exceed 100 characters")
+	}
+}

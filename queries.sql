@@ -6,6 +6,36 @@ CREATE TABLE users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+create table projects (
+  project_id uuid not null default gen_random_uuid (),
+  user_id uuid not null,
+  project_name character varying not null,
+  color character varying null,
+  is_inbox boolean null default false,
+  parent_project_id uuid null,
+  constraint projects_pkey primary key (project_id),
+  constraint projects_parent_project_id_fkey foreign KEY (parent_project_id) references projects (project_id),
+  constraint projects_user_id_fkey foreign KEY (user_id) references auth.users (id)
+)
+
+create table tasks (
+  task_id uuid not null default gen_random_uuid (),
+  project_id uuid not null,
+  user_id uuid not null,
+  content text not null,
+  description text null,
+  due_date date null,
+  date_datetime time with time zone null,
+  priority smallint null,
+  is_completed boolean null default false,
+  completed_at timestamp with time zone null,
+  parent_task_id uuid null,
+  constraint Tasks_pkey primary key (task_id),
+  constraint tasks_parent_task_id_fkey foreign KEY (parent_task_id) references tasks (task_id) on update CASCADE on delete CASCADE,
+  constraint tasks_project_id_fkey foreign KEY (project_id) references projects (project_id),
+  constraint tasks_user_id_fkey foreign KEY (user_id) references auth.users (id)
+)
+
 CREATE TABLE todos (
     todo_id SERIAL PRIMARY KEY,
     user_id INT NOT NULL,

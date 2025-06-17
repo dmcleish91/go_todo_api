@@ -45,6 +45,18 @@ func (app *application) Routes() *echo.Echo {
 	secured.POST("/toggleComplete", app.ToggleTodoCompleted)
 	secured.DELETE("/todos", app.DeleteTodo)
 
+	// Project endpoints
+	secured.POST("/projects", app.AddNewProject)
+	secured.PUT("/projects", app.EditExistingProject)
+	secured.GET("/projects", app.GetProjectsByUserID)
+	secured.DELETE("/projects", app.DeleteProject)
+
+	// Task endpoints
+	secured.POST("/tasks", app.AddNewTask)
+	secured.PUT("/tasks", app.EditExistingTask)
+	secured.GET("/tasks", app.GetTasksByUserID)
+	secured.DELETE("/tasks", app.DeleteTask)
+
 	return e
 }
 

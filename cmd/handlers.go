@@ -7,30 +7,9 @@ import (
 	"strings"
 
 	"github.com/dmcleish91/go_todo_api/internal/models"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
-
-func (app *application) UpdateUserEmail(c echo.Context) error {
-	type UpdateEmailInput struct {
-		NewEmail string `json:"new_email"`
-	}
-	email := c.Param("email")
-	var input UpdateEmailInput
-
-	if err := c.Bind(&input); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
-	}
-
-	rowsAffected, err := app.users.UpdateUserEmail(email, input.NewEmail)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
-	}
-
-	return c.JSON(http.StatusOK, map[string]interface{}{
-		"message":       "Email updated successfully",
-		"rows_affected": rowsAffected,
-	})
-}
 
 func (app *application) AddNewTodo(c echo.Context) error {
 	var todo models.Todo
@@ -38,8 +17,10 @@ func (app *application) AddNewTodo(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
 	}
 
-	if todo.Title == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
+	v := models.NewValidator()
+	models.ValidateTodo(&todo, v)
+	if !v.Valid() {
+		return c.JSON(http.StatusUnprocessableEntity, map[string]any{"errors": v.Errors})
 	}
 
 	userID := GetUserID(c)
@@ -170,4 +151,186 @@ func (app *application) AddNewTag(c echo.Context) error {
 func CleanStringRegex(input string) string {
 	reg := regexp.MustCompile("[^a-zA-Z0-9]+")
 	return reg.ReplaceAllString(strings.TrimSpace(input), "")
+}
+
+// Project Handlers
+func (app *application) AddNewProject(c echo.Context) error {
+	var project models.Project
+	if err := c.Bind(&project); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
+	}
+
+	userID := GetUserID(c)
+	if userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
+	}
+	project.UserID = uid
+
+	created, err := app.projects.AddProject(project)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	return c.JSON(http.StatusCreated, map[string]any{"message": "Project added successfully", "data": created})
+}
+
+func (app *application) EditExistingProject(c echo.Context) error {
+	var project models.Project
+	if err := c.Bind(&project); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
+	}
+	userID := GetUserID(c)
+	if userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
+	}
+	project.UserID = uid
+
+	updated, err := app.projects.EditProjectByID(project)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, map[string]any{"message": "Project updated successfully", "data": updated})
+}
+
+func (app *application) GetProjectsByUserID(c echo.Context) error {
+	userID := GetUserID(c)
+	if userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
+	}
+	projects, err := app.projects.GetProjectsByUserID(uid)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, projects)
+}
+
+func (app *application) DeleteProject(c echo.Context) error {
+	projectIDStr := c.QueryParam("project_id")
+	projectID, err := uuid.Parse(projectIDStr)
+	if err != nil || projectIDStr == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid project ID"})
+	}
+	userID := GetUserID(c)
+	if userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
+	}
+	rowsAffected, err := app.projects.DeleteProjectByID(projectID, uid)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, map[string]any{"message": "Project deleted successfully", "rows_affected": rowsAffected})
+}
+
+// Task Handlers
+func (app *application) AddNewTask(c echo.Context) error {
+	var task models.Task
+	if err := c.Bind(&task); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
+	}
+
+	// Create a new validator
+	v := models.NewValidator()
+
+	// Validate the task
+	models.ValidateTask(&task, v)
+
+	// Check if validation failed
+	if !v.Valid() {
+		return c.JSON(http.StatusUnprocessableEntity, map[string]any{"errors": v.Errors})
+	}
+
+	userID := GetUserID(c)
+	if userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
+
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
+	}
+
+	task.UserID = uid
+
+	created, err := app.tasks.AddTask(task)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	return c.JSON(http.StatusCreated, map[string]any{"message": "Task added successfully", "data": created})
+}
+
+func (app *application) EditExistingTask(c echo.Context) error {
+	var task models.Task
+	if err := c.Bind(&task); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
+	}
+	userID := GetUserID(c)
+	if userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
+	}
+	task.UserID = uid
+	if task.ProjectID == uuid.Nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Project ID is required"})
+	}
+	updated, err := app.tasks.EditTaskByID(task)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, map[string]any{"message": "Task updated successfully", "data": updated})
+}
+
+func (app *application) GetTasksByUserID(c echo.Context) error {
+	userID := GetUserID(c)
+	if userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
+	}
+	tasks, err := app.tasks.GetTasksByUserID(uid)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, tasks)
+}
+
+func (app *application) DeleteTask(c echo.Context) error {
+	taskIDStr := c.QueryParam("task_id")
+	taskID, err := uuid.Parse(taskIDStr)
+	if err != nil || taskIDStr == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid task ID"})
+	}
+	userID := GetUserID(c)
+	if userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
+	}
+	rowsAffected, err := app.tasks.DeleteTaskByID(taskID, uid)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, map[string]any{"message": "Task deleted successfully", "rows_affected": rowsAffected})
 }

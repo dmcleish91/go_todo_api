@@ -242,22 +242,35 @@ func (app *application) AddNewTask(c echo.Context) error {
 	if err := c.Bind(&task); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
 	}
+
+	// Create a new validator
+	v := models.NewValidator()
+
+	// Validate the task
+	models.ValidateTask(&task, v)
+
+	// Check if validation failed
+	if !v.Valid() {
+		return c.JSON(http.StatusUnprocessableEntity, map[string]any{"errors": v.Errors})
+	}
+
 	userID := GetUserID(c)
 	if userID == "" {
 		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
 	}
+
 	uid, err := uuid.Parse(userID)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
 	}
+
 	task.UserID = uid
-	if task.ProjectID == uuid.Nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Project ID is required"})
-	}
+
 	created, err := app.tasks.AddTask(task)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
+
 	return c.JSON(http.StatusCreated, map[string]any{"message": "Task added successfully", "data": created})
 }
 

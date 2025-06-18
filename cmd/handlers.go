@@ -238,18 +238,20 @@ func (app *application) DeleteProject(c echo.Context) error {
 
 // Task Handlers
 func (app *application) AddNewTask(c echo.Context) error {
-	var task models.Task
-	if err := c.Bind(&task); err != nil {
+	var input models.NewTask
+	if err := c.Bind(&input); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
 	}
 
 	// Create a new validator
 	v := models.NewValidator()
 
-	// Validate the task
-	models.ValidateTask(&task, v)
+	// Validate the input (customize as needed for NewTask)
+	if input.Content == "" {
+		v.AddError("content", "Content is required")
+	}
+	// You can add more validation for other fields if needed
 
-	// Check if validation failed
 	if !v.Valid() {
 		return c.JSON(http.StatusUnprocessableEntity, map[string]any{"errors": v.Errors})
 	}
@@ -264,9 +266,7 @@ func (app *application) AddNewTask(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
 	}
 
-	task.UserID = uid
-
-	created, err := app.tasks.AddTask(task)
+	created, err := app.tasks.AddTask(input, uid)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
@@ -288,9 +288,7 @@ func (app *application) EditExistingTask(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
 	}
 	task.UserID = uid
-	if task.ProjectID == uuid.Nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Project ID is required"})
-	}
+
 	updated, err := app.tasks.EditTaskByID(task)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})

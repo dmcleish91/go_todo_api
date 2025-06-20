@@ -23,9 +23,7 @@ func (app *application) Routes() *echo.Echo {
 
 	e.Use(ServerHeader)
 
-	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
-		Format: `[${time_rfc3339} ${status} ${method} ${host}${path} ${latency_human}]` + "\n",
-	}))
+	e.Use(StructuredLogger(app.logger))
 
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins:     []string{"http://localhost:5173", "https://yata-delta.vercel.app"},
@@ -104,13 +102,6 @@ func (app *application) SupabaseJWTMiddleware() echo.MiddlewareFunc {
 			return next(c)
 		}
 	}
-}
-
-func GetUserID(c echo.Context) string {
-	if userID, ok := c.Get("user_id").(string); ok {
-		return userID
-	}
-	return ""
 }
 
 func ServerHeader(next echo.HandlerFunc) echo.HandlerFunc {

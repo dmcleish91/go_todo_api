@@ -11,6 +11,13 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+func GetUserID(c echo.Context) string {
+	if userID, ok := c.Get("user_id").(string); ok {
+		return userID
+	}
+	return ""
+}
+
 func (app *application) AddNewTodo(c echo.Context) error {
 	var todo models.Todo
 	if err := c.Bind(&todo); err != nil {
@@ -240,7 +247,7 @@ func (app *application) DeleteProject(c echo.Context) error {
 func (app *application) AddNewTask(c echo.Context) error {
 	var input models.NewTask
 	if err := c.Bind(&input); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input", "message": err.Error()})
 	}
 
 	// Create a new validator

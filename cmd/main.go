@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/dmcleish91/go_todo_api/internal/models"
@@ -12,6 +13,7 @@ type application struct {
 	todos    *models.TodoModel
 	projects *models.ProjectModel
 	tasks    *models.TaskModel
+	logger   *slog.Logger
 }
 
 func main() {
@@ -22,6 +24,8 @@ func main() {
 	port := os.Getenv("port")
 	dbname := os.Getenv("dbname")
 
+	logger := NewStructuredLogger()
+
 	DATABASE_URL := fmt.Sprintf("postgresql://%s:%s@%s:%s/%s", user, password, host, port, dbname)
 
 	conn := CreateDatabaseConnection(DATABASE_URL)
@@ -31,9 +35,11 @@ func main() {
 		todos:    &models.TodoModel{DB: conn},
 		projects: &models.ProjectModel{DB: conn},
 		tasks:    &models.TaskModel{DB: conn},
+		logger:   logger,
 	}
 
 	e := app.Routes()
 
+	logger.Info("starting server on :1323")
 	e.Logger.Fatal(e.Start(":1323"))
 }

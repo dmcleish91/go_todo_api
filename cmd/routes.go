@@ -47,6 +47,7 @@ func (app *application) Routes() *echo.Echo {
 	secured.PUT("/tasks", app.EditExistingTask)
 	secured.GET("/tasks", app.GetTasksByUserID)
 	secured.DELETE("/tasks", app.DeleteTask)
+	secured.PUT("/tasks/:id/toggle-completion", app.ToggleTaskCompletion)
 
 	return e
 }

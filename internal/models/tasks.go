@@ -175,15 +175,38 @@ func (m *TaskModel) GetTasksByUserID(userID uuid.UUID) ([]Task, error) {
 	return tasks, nil
 }
 
-func (m *TaskModel) ToggleTaskCompleted(taskID uuid.UUID, userID uuid.UUID) (int64, error) {
-	query := `UPDATE tasks SET is_completed = NOT is_completed, completed_at = CASE WHEN is_completed THEN NULL ELSE CURRENT_TIMESTAMP END WHERE task_id = $1 AND user_id = $2`
+func (m *TaskModel) ToggleTaskCompleted(taskID uuid.UUID, userID uuid.UUID) (Task, error) {
+	query := `
+		UPDATE tasks
+		SET completed_at = CASE WHEN is_completed THEN NULL ELSE CURRENT_TIMESTAMP END, is_completed = NOT is_completed
+		WHERE task_id = $1 AND user_id = $2
+		RETURNING task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id`
 
-	result, err := m.DB.Exec(context.Background(), query, taskID, userID)
+	var updatedTask Task
+	err := m.DB.QueryRow(
+		context.Background(),
+		query,
+		taskID,
+		userID,
+	).Scan(
+		&updatedTask.TaskID,
+		&updatedTask.ProjectID,
+		&updatedTask.UserID,
+		&updatedTask.Content,
+		&updatedTask.Description,
+		&updatedTask.DueDate,
+		&updatedTask.DueDatetime,
+		&updatedTask.Priority,
+		&updatedTask.IsCompleted,
+		&updatedTask.CompletedAt,
+		&updatedTask.ParentTaskID,
+	)
+
 	if err != nil {
-		return 0, fmt.Errorf("unable to update task: %v", err)
+		return Task{}, fmt.Errorf("unable to execute query: %v", err)
 	}
 
-	return result.RowsAffected(), nil
+	return updatedTask, nil
 }
 
 func (m *TaskModel) DeleteTaskByID(taskID uuid.UUID, userID uuid.UUID) (int64, error) {

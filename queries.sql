@@ -13,18 +13,19 @@ create table projects (
   constraint projects_user_id_fkey foreign KEY (user_id) references auth.users (id)
 );
 
-create table tasks (
+create table public.tasks (
   task_id uuid not null default gen_random_uuid (),
-  project_id uuid not null,
+  project_id uuid null,
   user_id uuid not null,
   content text not null,
   description text null,
   due_date date null,
-  date_datetime time with time zone null,
+  due_datetime time without time zone null,
   priority smallint null,
   is_completed boolean null default false,
   completed_at timestamp with time zone null,
   parent_task_id uuid null,
+  created_at timestamp with time zone not null default now(),
   constraint Tasks_pkey primary key (task_id),
   constraint tasks_parent_task_id_fkey foreign KEY (parent_task_id) references tasks (task_id) on update CASCADE on delete CASCADE,
   constraint tasks_project_id_fkey foreign KEY (project_id) references projects (project_id),
@@ -84,9 +85,10 @@ WHERE task_id = $1 AND user_id = $2
 RETURNING task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id;
 
 -- GetTasksByUserID
-SELECT task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id
+SELECT task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, created_at
 FROM tasks
-WHERE user_id = $1;
+WHERE user_id = $1
+ORDER BY created_at ASC;
 
 -- ToggleTaskCompleted
 UPDATE tasks SET is_completed = NOT is_completed, completed_at = CASE WHEN is_completed THEN NULL ELSE CURRENT_TIMESTAMP END WHERE task_id = $1 AND user_id = $2;

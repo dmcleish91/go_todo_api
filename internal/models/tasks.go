@@ -21,6 +21,7 @@ type Task struct {
 	IsCompleted  bool       `json:"is_completed"`
 	CompletedAt  *time.Time `json:"completed_at"` // nullable time.Time: use nil for null
 	ParentTaskID *uuid.UUID `json:"parent_task_id"`
+	CreatedAt    time.Time  `json:"created_at"`
 }
 
 type TaskModel struct {
@@ -139,9 +140,10 @@ func (m *TaskModel) EditTaskByID(task Task) (Task, error) {
 
 func (m *TaskModel) GetTasksByUserID(userID uuid.UUID) ([]Task, error) {
 	query := `
-		SELECT task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id
+		SELECT task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, created_at
 		FROM tasks
-		WHERE user_id = $1`
+		WHERE user_id = $1
+		ORDER BY created_at ASC`
 
 	rows, err := m.DB.Query(context.Background(), query, userID)
 	if err != nil {
@@ -165,6 +167,7 @@ func (m *TaskModel) GetTasksByUserID(userID uuid.UUID) ([]Task, error) {
 			&task.IsCompleted,
 			&task.CompletedAt,
 			&task.ParentTaskID,
+			&task.CreatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("unable to scan row: %v", err)

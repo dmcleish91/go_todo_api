@@ -10,7 +10,6 @@ import (
 )
 
 type application struct {
-	todos    *models.TodoModel
 	projects *models.ProjectModel
 	tasks    *models.TaskModel
 	logger   *slog.Logger
@@ -32,7 +31,6 @@ func main() {
 	defer conn.Close()
 
 	app := &application{
-		todos:    &models.TodoModel{DB: conn},
 		projects: &models.ProjectModel{DB: conn},
 		tasks:    &models.TaskModel{DB: conn},
 		logger:   logger,

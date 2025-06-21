@@ -36,13 +36,6 @@ func (app *application) Routes() *echo.Echo {
 
 	secured.Use(app.SupabaseJWTMiddleware())
 
-	secured.GET("/todos", app.GetTodosByUserID)
-	secured.POST("/todos", app.AddNewTodo)
-	secured.POST("/editTodo", app.EditExistingTodo)
-	secured.POST("/tag", app.AddNewTag)
-	secured.POST("/toggleComplete", app.ToggleTodoCompleted)
-	secured.DELETE("/todos", app.DeleteTodo)
-
 	// Project endpoints
 	secured.POST("/projects", app.AddNewProject)
 	secured.PUT("/projects", app.EditExistingProject)

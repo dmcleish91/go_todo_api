@@ -1,11 +1,6 @@
-CREATE TABLE users (
-    user_id SERIAL PRIMARY KEY,
-    username VARCHAR(100) NOT NULL,
-    email VARCHAR(100) NOT NULL UNIQUE,
-    password_hash VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+-- The queries.sql file is a reference for all the SQL statements used in the application.
 
+-- The queries below are used to create the tables in the database.
 create table projects (
   project_id uuid not null default gen_random_uuid (),
   user_id uuid not null,
@@ -16,7 +11,7 @@ create table projects (
   constraint projects_pkey primary key (project_id),
   constraint projects_parent_project_id_fkey foreign KEY (parent_project_id) references projects (project_id),
   constraint projects_user_id_fkey foreign KEY (user_id) references auth.users (id)
-)
+);
 
 create table tasks (
   task_id uuid not null default gen_random_uuid (),
@@ -34,87 +29,67 @@ create table tasks (
   constraint tasks_parent_task_id_fkey foreign KEY (parent_task_id) references tasks (task_id) on update CASCADE on delete CASCADE,
   constraint tasks_project_id_fkey foreign KEY (project_id) references projects (project_id),
   constraint tasks_user_id_fkey foreign KEY (user_id) references auth.users (id)
-)
-
-CREATE TABLE todos (
-    todo_id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL,
-    title VARCHAR(255) NOT NULL,
-    description TEXT,
-    is_completed BOOLEAN DEFAULT FALSE,
-    due_date DATE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    tags TEXT[] DEFAULT ARRAY[]::TEXT[],
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
-CREATE TABLE tags (
-    tag_id SERIAL PRIMARY KEY,
-    name VARCHAR(50) NOT NULL,
-    CONSTRAINT unique_tag_name UNIQUE (name)
-);
 
-CREATE TABLE refresh_tokens (
-    token_id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL,
-    token VARCHAR(255) NOT NULL,
-    expires_at TIMESTAMP NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
-);
+-- The queries below are used in the projects model.
 
--- Add index for faster token lookups
-CREATE INDEX idx_refresh_token ON refresh_tokens(token);
+-- AddProject
+INSERT INTO projects (
+    user_id, project_name, color, is_inbox, parent_project_id
+) VALUES (
+    $1, $2, $3, $4, $5
+) RETURNING project_id, user_id, project_name, color, is_inbox, parent_project_id;
 
--- Signup: Insert a new user
-INSERT INTO users (username, email, password_hash) 
-VALUES ($1, $2, $3);
+-- EditProjectByID
+UPDATE projects SET
+    project_name = $3,
+    color = $4,
+    is_inbox = $5,
+    parent_project_id = $6
+WHERE project_id = $1 AND user_id = $2
+RETURNING project_id, user_id, project_name, color, is_inbox, parent_project_id;
 
--- Login: Fetch user by email to verify credentials
-SELECT user_id, username, password_hash 
-FROM users 
-WHERE email = $1;
-
--- Get list of todos for a specific user
-SELECT 
-    todo_id, 
-    title, 
-    description, 
-    is_completed, 
-    due_date, 
-    created_at, 
-    updated_at,
-    tags
-FROM todos
+-- GetProjectsByUserID
+SELECT project_id, user_id, project_name, color, is_inbox, parent_project_id
+FROM projects
 WHERE user_id = $1
-ORDER BY created_at DESC;
+ORDER BY project_name ASC;
 
--- Add a new todo
-INSERT INTO todos (user_id, title, description, due_date, tags) 
-VALUES ($1, $2, $3, $4, $5);
+-- DeleteProjectByID
+DELETE FROM projects WHERE project_id = $1 AND user_id = $2;
 
--- Edit an existing todo
-UPDATE todos 
-SET title = $3,
-    description = $4,
-    due_date = $5,
-    tags = $6,
-    updated_at = CURRENT_TIMESTAMP
-WHERE todo_id = $1 
-AND user_id = $2
-RETURNING todo_id, title, description, due_date, is_completed, updated_at, tags;
 
--- Mark a todo as complete
-UPDATE todos 
-SET is_completed = TRUE, updated_at = CURRENT_TIMESTAMP 
-WHERE todo_id = $1 AND user_id = $2;
+-- The queries below are used in the tasks model.
 
--- Delete a todo
-DELETE FROM todos 
-WHERE todo_id = $1 AND user_id = $2;
+-- AddTask
+INSERT INTO tasks (
+    project_id, user_id, content, description, due_date, due_datetime, priority, parent_task_id
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8
+) RETURNING task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id;
 
--- Add a new tag preset (if needed)
-INSERT INTO tags (name) 
-VALUES ($1) 
-RETURNING tag_id;
+-- EditTaskByID
+UPDATE tasks SET
+    project_id = $3,
+    content = $4,
+    description = $5,
+    due_date = $6,
+    due_datetime = $7,
+    priority = $8,
+    is_completed = $9,
+    completed_at = $10,
+    parent_task_id = $11
+WHERE task_id = $1 AND user_id = $2
+RETURNING task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id;
+
+-- GetTasksByUserID
+SELECT task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id
+FROM tasks
+WHERE user_id = $1;
+
+-- ToggleTaskCompleted
+UPDATE tasks SET is_completed = NOT is_completed, completed_at = CASE WHEN is_completed THEN NULL ELSE CURRENT_TIMESTAMP END WHERE task_id = $1 AND user_id = $2;
+
+-- DeleteTaskByID
+DELETE FROM tasks WHERE task_id = $1 AND user_id = $2;

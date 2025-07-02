@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -15,6 +16,7 @@ type Project struct {
 	Color           *string    `json:"color"`
 	IsInbox         *bool      `json:"is_inbox"`
 	ParentProjectID *uuid.UUID `json:"parent_project_id"`
+	CreatedAt       time.Time  `json:"created_at"`
 }
 
 type ProjectModel struct {
@@ -27,7 +29,7 @@ func (m *ProjectModel) AddProject(project Project) (Project, error) {
 			user_id, project_name, color, is_inbox, parent_project_id
 		) VALUES (
 			$1, $2, $3, $4, $5
-		) RETURNING project_id, user_id, project_name, color, is_inbox, parent_project_id
+		) RETURNING project_id, user_id, project_name, color, is_inbox, parent_project_id, created_at
 	`
 
 	var createdProject Project
@@ -46,6 +48,7 @@ func (m *ProjectModel) AddProject(project Project) (Project, error) {
 		&createdProject.Color,
 		&createdProject.IsInbox,
 		&createdProject.ParentProjectID,
+		&createdProject.CreatedAt,
 	)
 
 	if err != nil {
@@ -63,7 +66,7 @@ func (m *ProjectModel) EditProjectByID(project Project) (Project, error) {
 			is_inbox = $5,
 			parent_project_id = $6
 		WHERE project_id = $1 AND user_id = $2
-		RETURNING project_id, user_id, project_name, color, is_inbox, parent_project_id
+		RETURNING project_id, user_id, project_name, color, is_inbox, parent_project_id, created_at
 	`
 
 	var updatedProject Project
@@ -83,6 +86,7 @@ func (m *ProjectModel) EditProjectByID(project Project) (Project, error) {
 		&updatedProject.Color,
 		&updatedProject.IsInbox,
 		&updatedProject.ParentProjectID,
+		&updatedProject.CreatedAt,
 	)
 
 	if err != nil {
@@ -94,10 +98,10 @@ func (m *ProjectModel) EditProjectByID(project Project) (Project, error) {
 
 func (m *ProjectModel) GetProjectsByUserID(userID uuid.UUID) ([]Project, error) {
 	query := `
-		SELECT project_id, user_id, project_name, color, is_inbox, parent_project_id
+		SELECT project_id, user_id, project_name, color, is_inbox, parent_project_id, created_at
 		FROM projects
 		WHERE user_id = $1
-		ORDER BY project_name ASC`
+		ORDER BY created_at ASC`
 
 	rows, err := m.DB.Query(context.Background(), query, userID)
 	if err != nil {
@@ -116,6 +120,7 @@ func (m *ProjectModel) GetProjectsByUserID(userID uuid.UUID) ([]Project, error) 
 			&project.Color,
 			&project.IsInbox,
 			&project.ParentProjectID,
+			&project.CreatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("unable to scan row: %v", err)

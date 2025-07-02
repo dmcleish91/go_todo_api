@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS public.projects (
     color character varying,
     is_inbox boolean DEFAULT false,
     parent_project_id uuid,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
     CONSTRAINT projects_pkey PRIMARY KEY (project_id),
     CONSTRAINT projects_parent_project_id_fkey FOREIGN KEY (parent_project_id) REFERENCES public.projects(project_id),
     CONSTRAINT projects_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)

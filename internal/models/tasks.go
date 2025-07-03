@@ -21,6 +21,7 @@ type Task struct {
 	IsCompleted  bool       `json:"is_completed"`
 	CompletedAt  *time.Time `json:"completed_at"` // nullable time.Time: use nil for null
 	ParentTaskID *uuid.UUID `json:"parent_task_id"`
+	Labels       []string   `json:"labels"`
 	CreatedAt    time.Time  `json:"created_at"`
 }
 
@@ -41,16 +42,17 @@ type NewTask struct {
 	DueDatetime  *time.Time `json:"due_datetime,omitempty"`
 	Priority     *int16     `json:"priority,omitempty"`
 	ParentTaskID *uuid.UUID `json:"parent_task_id,omitempty"`
+	Labels       []string   `json:"labels,omitempty"`
 }
 
 // AddTask inserts a new task into the database using NewTask and userID
 func (m *TaskModel) AddTask(input NewTask, userID uuid.UUID) (Task, error) {
 	query := `
 		INSERT INTO tasks (
-			project_id, user_id, content, description, due_date, due_datetime, priority, parent_task_id
+			project_id, user_id, content, description, due_date, due_datetime, priority, parent_task_id, labels
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8
-		) RETURNING task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id
+			$1, $2, $3, $4, $5, $6, $7, $8, $9
+		) RETURNING task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, labels
 	`
 
 	var createdTask Task
@@ -65,6 +67,7 @@ func (m *TaskModel) AddTask(input NewTask, userID uuid.UUID) (Task, error) {
 		input.DueDatetime,
 		input.Priority,
 		input.ParentTaskID,
+		input.Labels,
 	).Scan(
 		&createdTask.TaskID,
 		&createdTask.ProjectID,
@@ -77,6 +80,7 @@ func (m *TaskModel) AddTask(input NewTask, userID uuid.UUID) (Task, error) {
 		&createdTask.IsCompleted,
 		&createdTask.CompletedAt,
 		&createdTask.ParentTaskID,
+		&createdTask.Labels,
 	)
 
 	if err != nil {
@@ -97,9 +101,10 @@ func (m *TaskModel) EditTaskByID(task Task) (Task, error) {
 			priority = $8,
 			is_completed = $9,
 			completed_at = $10,
-			parent_task_id = $11
+			parent_task_id = $11,
+			labels = $12
 		WHERE task_id = $1 AND user_id = $2
-		RETURNING task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id
+		RETURNING task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, labels
 	`
 
 	var updatedTask Task
@@ -117,6 +122,7 @@ func (m *TaskModel) EditTaskByID(task Task) (Task, error) {
 		task.IsCompleted,
 		task.CompletedAt,
 		task.ParentTaskID,
+		task.Labels,
 	).Scan(
 		&updatedTask.TaskID,
 		&updatedTask.ProjectID,
@@ -129,6 +135,7 @@ func (m *TaskModel) EditTaskByID(task Task) (Task, error) {
 		&updatedTask.IsCompleted,
 		&updatedTask.CompletedAt,
 		&updatedTask.ParentTaskID,
+		&updatedTask.Labels,
 	)
 
 	if err != nil {
@@ -140,7 +147,7 @@ func (m *TaskModel) EditTaskByID(task Task) (Task, error) {
 
 func (m *TaskModel) GetTasksByUserID(userID uuid.UUID) ([]Task, error) {
 	query := `
-		SELECT task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, created_at
+		SELECT task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, labels, created_at
 		FROM tasks
 		WHERE user_id = $1
 		ORDER BY created_at ASC`
@@ -167,6 +174,7 @@ func (m *TaskModel) GetTasksByUserID(userID uuid.UUID) ([]Task, error) {
 			&task.IsCompleted,
 			&task.CompletedAt,
 			&task.ParentTaskID,
+			&task.Labels,
 			&task.CreatedAt,
 		)
 		if err != nil {
@@ -183,7 +191,7 @@ func (m *TaskModel) ToggleTaskCompleted(taskID uuid.UUID, userID uuid.UUID) (Tas
 		UPDATE tasks
 		SET completed_at = CASE WHEN is_completed THEN NULL ELSE CURRENT_TIMESTAMP END, is_completed = NOT is_completed
 		WHERE task_id = $1 AND user_id = $2
-		RETURNING task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id`
+		RETURNING task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, labels`
 
 	var updatedTask Task
 	err := m.DB.QueryRow(
@@ -203,6 +211,7 @@ func (m *TaskModel) ToggleTaskCompleted(taskID uuid.UUID, userID uuid.UUID) (Tas
 		&updatedTask.IsCompleted,
 		&updatedTask.CompletedAt,
 		&updatedTask.ParentTaskID,
+		&updatedTask.Labels,
 	)
 
 	if err != nil {

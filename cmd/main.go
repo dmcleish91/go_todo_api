@@ -12,6 +12,7 @@ import (
 type application struct {
 	projects *models.ProjectModel
 	tasks    *models.TaskModel
+	labels   *models.LabelModel
 	logger   *slog.Logger
 }
 
@@ -33,6 +34,7 @@ func main() {
 	app := &application{
 		projects: &models.ProjectModel{DB: conn},
 		tasks:    &models.TaskModel{DB: conn},
+		labels:   &models.LabelModel{DB: conn},
 		logger:   logger,
 	}
 

@@ -219,3 +219,102 @@ func (app *application) ToggleTaskCompletion(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, map[string]any{"message": "Task updated successfully", "data": updatedTask})
 }
+
+// Label Handlers
+func (app *application) AddNewLabel(c echo.Context) error {
+	var input struct {
+		Name string `json:"name"`
+	}
+	if err := c.Bind(&input); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
+	}
+	userID := GetUserID(c)
+	if userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
+	}
+	label := models.Label{UserID: uid, Name: input.Name}
+	v := models.NewValidator()
+	models.ValidateLabel(&label, v)
+	if !v.Valid() {
+		return c.JSON(http.StatusUnprocessableEntity, map[string]any{"errors": v.Errors})
+	}
+	created, err := app.labels.AddLabel(uid, input.Name)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	return c.JSON(http.StatusCreated, map[string]any{"message": "Label added successfully", "data": created})
+}
+
+func (app *application) EditExistingLabel(c echo.Context) error {
+	var input struct {
+		LabelID string `json:"label_id"`
+		Name    string `json:"name"`
+	}
+	if err := c.Bind(&input); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
+	}
+	userID := GetUserID(c)
+	if userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
+	}
+	labelID, err := uuid.Parse(input.LabelID)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid label ID"})
+	}
+	label := models.Label{LabelID: labelID, UserID: uid, Name: input.Name}
+	v := models.NewValidator()
+	models.ValidateLabel(&label, v)
+	if !v.Valid() {
+		return c.JSON(http.StatusUnprocessableEntity, map[string]any{"errors": v.Errors})
+	}
+	updated, err := app.labels.EditLabelByID(labelID, uid, input.Name)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, map[string]any{"message": "Label updated successfully", "data": updated})
+}
+
+func (app *application) GetLabelsByUserID(c echo.Context) error {
+	userID := GetUserID(c)
+	if userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
+	}
+	labels, err := app.labels.GetLabelsByUserID(uid)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, labels)
+}
+
+func (app *application) DeleteLabel(c echo.Context) error {
+	labelIDStr := c.QueryParam("label_id")
+	labelID, err := uuid.Parse(labelIDStr)
+	if err != nil || labelIDStr == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid label ID"})
+	}
+	userID := GetUserID(c)
+	if userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
+	}
+	rowsAffected, err := app.labels.DeleteLabelByID(labelID, uid)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, map[string]any{"message": "Label deleted successfully", "rows_affected": rowsAffected})
+}

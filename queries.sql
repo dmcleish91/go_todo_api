@@ -13,6 +13,16 @@ CREATE TABLE IF NOT EXISTS public.projects (
     CONSTRAINT projects_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 
+CREATE TABLE IF NOT EXISTS public.labels (
+    label_id uuid NOT NULL DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL,
+    name character varying NOT NULL,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT labels_pkey PRIMARY KEY (label_id),
+    CONSTRAINT labels_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
+    CONSTRAINT labels_user_name_unique UNIQUE (user_id, name)
+);
+
 CREATE TABLE IF NOT EXISTS public.tasks (
     task_id uuid NOT NULL DEFAULT gen_random_uuid(),
     project_id uuid,
@@ -25,6 +35,7 @@ CREATE TABLE IF NOT EXISTS public.tasks (
     is_completed boolean DEFAULT false,
     completed_at timestamp with time zone,
     parent_task_id uuid,
+    labels jsonb DEFAULT '[]'::jsonb,
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     CONSTRAINT tasks_pkey PRIMARY KEY (task_id),
     CONSTRAINT tasks_parent_task_id_fkey FOREIGN KEY (parent_task_id) REFERENCES public.tasks(task_id),
@@ -61,14 +72,39 @@ ORDER BY project_name ASC;
 DELETE FROM projects WHERE project_id = $1 AND user_id = $2;
 
 
+-- The queries below are used in the labels model.
+
+-- AddLabel
+INSERT INTO labels (
+    user_id, name
+) VALUES (
+    $1, $2
+) RETURNING label_id, user_id, name, created_at;
+
+-- EditLabelByID
+UPDATE labels SET
+    name = $3
+WHERE label_id = $1 AND user_id = $2
+RETURNING label_id, user_id, name, created_at;
+
+-- GetLabelsByUserID
+SELECT label_id, user_id, name, created_at
+FROM labels
+WHERE user_id = $1
+ORDER BY name ASC;
+
+-- DeleteLabelByID
+DELETE FROM labels WHERE label_id = $1 AND user_id = $2;
+
+
 -- The queries below are used in the tasks model.
 
 -- AddTask
 INSERT INTO tasks (
-    project_id, user_id, content, description, due_date, due_datetime, priority, parent_task_id
+    project_id, user_id, content, description, due_date, due_datetime, priority, parent_task_id, labels
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8
-) RETURNING task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id;
+    $1, $2, $3, $4, $5, $6, $7, $8, $9
+) RETURNING task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, labels;
 
 -- EditTaskByID
 UPDATE tasks SET
@@ -80,12 +116,13 @@ UPDATE tasks SET
     priority = $8,
     is_completed = $9,
     completed_at = $10,
-    parent_task_id = $11
+    parent_task_id = $11,
+    labels = $12
 WHERE task_id = $1 AND user_id = $2
-RETURNING task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id;
+RETURNING task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, labels;
 
 -- GetTasksByUserID
-SELECT task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, created_at
+SELECT task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, labels, created_at
 FROM tasks
 WHERE user_id = $1
 ORDER BY created_at ASC;
@@ -95,3 +132,9 @@ UPDATE tasks SET is_completed = NOT is_completed, completed_at = CASE WHEN is_co
 
 -- DeleteTaskByID
 DELETE FROM tasks WHERE task_id = $1 AND user_id = $2;
+
+-- AddLabelToTask
+UPDATE tasks SET labels = labels || $2::jsonb WHERE task_id = $1 AND user_id = $3;
+
+-- RemoveLabelFromTask
+UPDATE tasks SET labels = labels - $2 WHERE task_id = $1 AND user_id = $3;

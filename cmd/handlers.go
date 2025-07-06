@@ -318,3 +318,59 @@ func (app *application) DeleteLabel(c echo.Context) error {
 	}
 	return c.JSON(http.StatusOK, map[string]any{"message": "Label deleted successfully", "rows_affected": rowsAffected})
 }
+
+// HandleReorderTasks handles PATCH /v1/tasks/reorder
+// It expects a JSON array of {task_id, order} and reorders sibling tasks atomically.
+func (app *application) HandleReorderTasks(c echo.Context) error {
+	userID := GetUserID(c)
+	if userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
+	}
+
+	var updates []models.TaskOrderUpdate
+	if err := c.Bind(&updates); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
+	}
+	if len(updates) == 0 {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "No tasks to reorder"})
+	}
+
+	// Fetch the first task to get project_id and parent_task_id
+	firstTaskID, err := uuid.Parse(updates[0].TaskID)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid task_id in input"})
+	}
+	task, err := app.tasks.GetTaskByID(firstTaskID, uid)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "Task not found or not owned by user"})
+	}
+	projectID := task.ProjectID
+	parentTaskID := task.ParentTaskID
+
+	// Validate all tasks are siblings (same project_id and parent_task_id)
+	for _, upd := range updates {
+		id, err := uuid.Parse(upd.TaskID)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid task_id in input"})
+		}
+		t, err := app.tasks.GetTaskByID(id, uid)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, map[string]string{"error": "Task not found or not owned by user"})
+		}
+		if (t.ProjectID == nil && projectID != nil) || (t.ProjectID != nil && projectID == nil) || (t.ProjectID != nil && projectID != nil && *t.ProjectID != *projectID) {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "All tasks must have the same project_id"})
+		}
+		if (t.ParentTaskID == nil && parentTaskID != nil) || (t.ParentTaskID != nil && parentTaskID == nil) || (t.ParentTaskID != nil && parentTaskID != nil && *t.ParentTaskID != *parentTaskID) {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "All tasks must have the same parent_task_id"})
+		}
+	}
+
+	if err := app.tasks.BulkUpdateTaskOrder(uid, projectID, parentTaskID, updates); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, map[string]string{"message": "Task order updated successfully"})
+}

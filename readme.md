@@ -95,6 +95,29 @@ The executable will be created in the root directory.
 - [ ] Add swagger documentation for the API endpoints.
 - [ ] Implement soft-delete for tasks and projects.
 
+## Task Ordering
+
+Tasks now have an `order` integer field, which determines their position among sibling tasks (same project and parent_task_id). You can reorder tasks using the new endpoint:
+
+### Reorder Tasks Endpoint
+
+```
+PATCH /v1/tasks/reorder
+```
+
+**Request Body:**
+
+```
+[
+  { "task_id": "a", "order": 0 },
+  { "task_id": "b", "order": 1 },
+  ...
+]
+```
+
+- All tasks must belong to the authenticated user and have the same `project_id` and `parent_task_id`.
+- The endpoint will update the order of these sibling tasks atomically.
+
 ## Contributing
 
 1.  Fork the project.

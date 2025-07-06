@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS public.tasks (
     is_completed boolean DEFAULT false,
     completed_at timestamp with time zone,
     parent_task_id uuid,
+    order integer NOT NULL DEFAULT 0,
     labels jsonb DEFAULT '[]'::jsonb,
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     CONSTRAINT tasks_pkey PRIMARY KEY (task_id),
@@ -101,10 +102,10 @@ DELETE FROM labels WHERE label_id = $1 AND user_id = $2;
 
 -- AddTask
 INSERT INTO tasks (
-    project_id, user_id, content, description, due_date, due_datetime, priority, parent_task_id, labels
+    project_id, user_id, content, description, due_date, due_datetime, priority, parent_task_id, order, labels
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9
-) RETURNING task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, labels;
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+) RETURNING task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, order, labels;
 
 -- EditTaskByID
 UPDATE tasks SET
@@ -117,12 +118,13 @@ UPDATE tasks SET
     is_completed = $9,
     completed_at = $10,
     parent_task_id = $11,
-    labels = $12
+    "order" = $12,
+    labels = $13
 WHERE task_id = $1 AND user_id = $2
-RETURNING task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, labels;
+RETURNING task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, order, labels;
 
 -- GetTasksByUserID
-SELECT task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, labels, created_at
+SELECT task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, order, labels, created_at
 FROM tasks
 WHERE user_id = $1
 ORDER BY created_at ASC;

@@ -21,6 +21,7 @@ type Task struct {
 	IsCompleted  bool       `json:"is_completed"`
 	CompletedAt  *time.Time `json:"completed_at"` // nullable time.Time: use nil for null
 	ParentTaskID *uuid.UUID `json:"parent_task_id"`
+	Order        int        `json:"order"`
 	Labels       []string   `json:"labels"`
 	CreatedAt    time.Time  `json:"created_at"`
 }
@@ -49,10 +50,10 @@ type NewTask struct {
 func (m *TaskModel) AddTask(input NewTask, userID uuid.UUID) (Task, error) {
 	query := `
 		INSERT INTO tasks (
-			project_id, user_id, content, description, due_date, due_datetime, priority, parent_task_id, labels
+			project_id, user_id, content, description, due_date, due_datetime, priority, parent_task_id, "order", labels
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9
-		) RETURNING task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, labels
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+		) RETURNING task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, "order", labels
 	`
 
 	var createdTask Task
@@ -67,6 +68,7 @@ func (m *TaskModel) AddTask(input NewTask, userID uuid.UUID) (Task, error) {
 		input.DueDatetime,
 		input.Priority,
 		input.ParentTaskID,
+		0, // default order, can be set by client if needed
 		input.Labels,
 	).Scan(
 		&createdTask.TaskID,
@@ -80,6 +82,7 @@ func (m *TaskModel) AddTask(input NewTask, userID uuid.UUID) (Task, error) {
 		&createdTask.IsCompleted,
 		&createdTask.CompletedAt,
 		&createdTask.ParentTaskID,
+		&createdTask.Order,
 		&createdTask.Labels,
 	)
 
@@ -102,9 +105,10 @@ func (m *TaskModel) EditTaskByID(task Task) (Task, error) {
 			is_completed = $9,
 			completed_at = $10,
 			parent_task_id = $11,
-			labels = $12
+			"order" = $12,
+			labels = $13
 		WHERE task_id = $1 AND user_id = $2
-		RETURNING task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, labels
+		RETURNING task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, "order", labels
 	`
 
 	var updatedTask Task
@@ -122,6 +126,7 @@ func (m *TaskModel) EditTaskByID(task Task) (Task, error) {
 		task.IsCompleted,
 		task.CompletedAt,
 		task.ParentTaskID,
+		task.Order,
 		task.Labels,
 	).Scan(
 		&updatedTask.TaskID,
@@ -135,6 +140,7 @@ func (m *TaskModel) EditTaskByID(task Task) (Task, error) {
 		&updatedTask.IsCompleted,
 		&updatedTask.CompletedAt,
 		&updatedTask.ParentTaskID,
+		&updatedTask.Order,
 		&updatedTask.Labels,
 	)
 
@@ -147,7 +153,7 @@ func (m *TaskModel) EditTaskByID(task Task) (Task, error) {
 
 func (m *TaskModel) GetTasksByUserID(userID uuid.UUID) ([]Task, error) {
 	query := `
-		SELECT task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, labels, created_at
+		SELECT task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, "order", labels, created_at
 		FROM tasks
 		WHERE user_id = $1
 		ORDER BY created_at ASC`
@@ -174,6 +180,7 @@ func (m *TaskModel) GetTasksByUserID(userID uuid.UUID) ([]Task, error) {
 			&task.IsCompleted,
 			&task.CompletedAt,
 			&task.ParentTaskID,
+			&task.Order,
 			&task.Labels,
 			&task.CreatedAt,
 		)
@@ -245,4 +252,112 @@ func ValidateTask(task *Task, v *Validator) {
 		timeStr := task.DueDatetime.Format("03:04 PM")
 		v.Check(timeStr != "", "due_datetime", "Due datetime must be in XX:XX AM/PM format")
 	}
+}
+
+// BulkUpdateTaskOrder updates the order of sibling tasks for a user, project, and parent_task_id.
+// All tasks must belong to the same user, project, and parent_task_id.
+type TaskOrderUpdate struct {
+	TaskID string `json:"task_id"`
+	Order  int    `json:"order"`
+}
+
+func (m *TaskModel) BulkUpdateTaskOrder(userID uuid.UUID, projectID *uuid.UUID, parentTaskID *uuid.UUID, updates []TaskOrderUpdate) error {
+	if len(updates) == 0 {
+		return nil
+	}
+
+	tx, err := m.DB.Begin(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			tx.Rollback(context.Background())
+		}
+	}()
+
+	// Build the CASE statement and collect task IDs
+	caseStmt := "CASE"
+	taskIDs := make([]string, 0, len(updates))
+	for _, upd := range updates {
+		caseStmt += " WHEN task_id = '" + upd.TaskID + "' THEN " + fmt.Sprintf("%d", upd.Order)
+		taskIDs = append(taskIDs, "'"+upd.TaskID+"'")
+	}
+	caseStmt += " END"
+
+	// Build the WHERE clause for sibling tasks
+	where := "user_id = $1"
+	args := []interface{}{userID}
+	argIdx := 2
+	if projectID != nil {
+		where += fmt.Sprintf(" AND project_id = $%d", argIdx)
+		args = append(args, *projectID)
+		argIdx++
+	} else {
+		where += fmt.Sprintf(" AND project_id IS NULL")
+	}
+	if parentTaskID != nil {
+		where += fmt.Sprintf(" AND parent_task_id = $%d", argIdx)
+		args = append(args, *parentTaskID)
+		argIdx++
+	} else {
+		where += fmt.Sprintf(" AND parent_task_id IS NULL")
+	}
+
+	where += fmt.Sprintf(" AND task_id IN (%s)", joinStrings(taskIDs, ", "))
+
+	query := fmt.Sprintf(`UPDATE tasks SET "order" = %s WHERE %s`, caseStmt, where)
+
+	_, err = tx.Exec(context.Background(), query, args...)
+	if err != nil {
+		tx.Rollback(context.Background())
+		return fmt.Errorf("failed to update task order: %w", err)
+	}
+
+	if err = tx.Commit(context.Background()); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return nil
+}
+
+// joinStrings joins a slice of strings with a separator.
+func joinStrings(strs []string, sep string) string {
+	if len(strs) == 0 {
+		return ""
+	}
+	result := strs[0]
+	for i := 1; i < len(strs); i++ {
+		result += sep + strs[i]
+	}
+	return result
+}
+
+// GetTaskByID fetches a single task by task_id and user_id
+func (m *TaskModel) GetTaskByID(taskID uuid.UUID, userID uuid.UUID) (Task, error) {
+	query := `
+		SELECT task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, "order", labels, created_at
+		FROM tasks
+		WHERE task_id = $1 AND user_id = $2
+	`
+	var task Task
+	err := m.DB.QueryRow(context.Background(), query, taskID, userID).Scan(
+		&task.TaskID,
+		&task.ProjectID,
+		&task.UserID,
+		&task.Content,
+		&task.Description,
+		&task.DueDate,
+		&task.DueDatetime,
+		&task.Priority,
+		&task.IsCompleted,
+		&task.CompletedAt,
+		&task.ParentTaskID,
+		&task.Order,
+		&task.Labels,
+		&task.CreatedAt,
+	)
+	if err != nil {
+		return Task{}, fmt.Errorf("unable to fetch task: %w", err)
+	}
+	return task, nil
 }

@@ -48,6 +48,7 @@ func (app *application) Routes() *echo.Echo {
 	secured.GET("/tasks", app.GetTasksByUserID)
 	secured.DELETE("/tasks", app.DeleteTask)
 	secured.PUT("/tasks/:id/toggle-completion", app.ToggleTaskCompletion)
+	secured.PATCH("/tasks/reorder", app.HandleReorderTasks)
 
 	// Label endpoints
 	secured.POST("/labels", app.AddNewLabel)

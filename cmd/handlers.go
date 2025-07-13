@@ -113,6 +113,10 @@ func (app *application) AddNewTask(c echo.Context) error {
 		v.AddError("content", "Content is required")
 	}
 	// You can add more validation for other fields if needed
+	// Optionally validate order is non-negative
+	if input.Order != nil && *input.Order < 0 {
+		v.AddError("order", "Order must be non-negative")
+	}
 
 	if !v.Valid() {
 		return c.JSON(http.StatusUnprocessableEntity, map[string]any{"errors": v.Errors})

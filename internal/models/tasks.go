@@ -44,6 +44,7 @@ type NewTask struct {
 	Priority     *int16     `json:"priority,omitempty"`
 	ParentTaskID *uuid.UUID `json:"parent_task_id,omitempty"`
 	Labels       []string   `json:"labels,omitempty"`
+	Order        *int       `json:"order,omitempty"`
 }
 
 // AddTask inserts a new task into the database using NewTask and userID
@@ -57,6 +58,10 @@ func (m *TaskModel) AddTask(input NewTask, userID uuid.UUID) (Task, error) {
 	`
 
 	var createdTask Task
+	orderValue := 0
+	if input.Order != nil {
+		orderValue = *input.Order
+	}
 	err := m.DB.QueryRow(
 		context.Background(),
 		query,
@@ -68,7 +73,7 @@ func (m *TaskModel) AddTask(input NewTask, userID uuid.UUID) (Task, error) {
 		input.DueDatetime,
 		input.Priority,
 		input.ParentTaskID,
-		0, // default order, can be set by client if needed
+		orderValue,
 		input.Labels,
 	).Scan(
 		&createdTask.TaskID,

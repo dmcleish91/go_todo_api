@@ -108,11 +108,16 @@ func (app *application) AddNewTask(c echo.Context) error {
 	// Create a new validator
 	v := models.NewValidator()
 
-	// Validate the input (customize as needed for NewTask)
+	// Validate the input
 	if input.Content == "" {
 		v.AddError("content", "Content is required")
 	}
-	// You can add more validation for other fields if needed
+	
+	// NEW: Validate that task_id is provided
+	if input.TaskID == uuid.Nil {
+		v.AddError("task_id", "Task ID is required")
+	}
+	
 	// Optionally validate order is non-negative
 	if input.Order != nil && *input.Order < 0 {
 		v.AddError("order", "Order must be non-negative")

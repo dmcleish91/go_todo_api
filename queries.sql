@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS public.labels (
 );
 
 CREATE TABLE IF NOT EXISTS public.tasks (
-    task_id uuid NOT NULL DEFAULT gen_random_uuid(),
+    task_id uuid NOT NULL,
     project_id uuid,
     user_id uuid NOT NULL,
     content text NOT NULL,
@@ -35,13 +35,13 @@ CREATE TABLE IF NOT EXISTS public.tasks (
     is_completed boolean DEFAULT false,
     completed_at timestamp with time zone,
     parent_task_id uuid,
-    order integer NOT NULL DEFAULT 0,
+    "order" integer NOT NULL DEFAULT 0,
     labels jsonb DEFAULT '[]'::jsonb,
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     CONSTRAINT tasks_pkey PRIMARY KEY (task_id),
-    CONSTRAINT tasks_parent_task_id_fkey FOREIGN KEY (parent_task_id) REFERENCES public.tasks(task_id),
-    CONSTRAINT tasks_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
-    CONSTRAINT tasks_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(project_id)
+    CONSTRAINT tasks_parent_task_id_fkey FOREIGN KEY (parent_task_id) REFERENCES public.tasks(task_id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT tasks_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(project_id) ON DELETE CASCADE,
+    CONSTRAINT tasks_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 
 
@@ -102,10 +102,10 @@ DELETE FROM labels WHERE label_id = $1 AND user_id = $2;
 
 -- AddTask
 INSERT INTO tasks (
-    project_id, user_id, content, description, due_date, due_datetime, priority, parent_task_id, order, labels
+    task_id, project_id, user_id, content, description, due_date, due_datetime, priority, parent_task_id, "order", labels
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
-) RETURNING task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, order, labels;
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+) RETURNING task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, "order", labels;
 
 -- EditTaskByID
 UPDATE tasks SET

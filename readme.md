@@ -74,19 +74,6 @@ go build -o todoapi.exe ./cmd/
 
 The executable will be created in the root directory.
 
-## Folder Structure
-
-```text
-.
-├── cmd/            # Main application, including main.go, handlers, routes, etc.
-├── internal/       # Private application code, including models and validation.
-│   └── models/     # Database models and data access logic.
-├── go.mod          # Go module file with dependencies.
-├── go.sum          # Go module checksums.
-├── queries.sql     # SQL queries for database schema and operations.
-└── readme.md       # This file.
-```
-
 ## Future Features / TODO
 
 - [ ] Add a comprehensive test suite (unit and integration tests).

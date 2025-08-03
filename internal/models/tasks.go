@@ -3,7 +3,6 @@ package models
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -259,8 +258,6 @@ func ValidateTask(task *Task, v *Validator) {
 	}
 }
 
-// BulkUpdateTaskOrder updates the order of sibling tasks for a user, project, and parent_task_id.
-// All tasks must belong to the same user, project, and parent_task_id.
 type TaskOrderUpdate struct {
 	TaskID string `json:"task_id"`
 	Order  int    `json:"order"`
@@ -271,18 +268,19 @@ func (m *TaskModel) BulkUpdateTaskOrder(userID uuid.UUID, projectID *uuid.UUID, 
 		return nil
 	}
 
+	// Build the CASE statement and collect task IDs
 	caseStmt := "CASE"
-	args := []any{userID}
-	argIdx := 2
-
+	taskIDs := make([]string, 0, len(updates))
 	for _, upd := range updates {
-		caseStmt += fmt.Sprintf(" WHEN task_id = $%d THEN $%d", argIdx, argIdx+1)
-		args = append(args, upd.TaskID, upd.Order)
-		argIdx += 2
+		caseStmt += " WHEN task_id = '" + upd.TaskID + "' THEN " + fmt.Sprintf("%d", upd.Order)
+		taskIDs = append(taskIDs, "'"+upd.TaskID+"'")
 	}
 	caseStmt += " END"
 
+	// Build the WHERE clause for sibling tasks
 	where := "user_id = $1"
+	args := []interface{}{userID}
+	argIdx := 2
 	if projectID != nil {
 		where += fmt.Sprintf(" AND project_id = $%d", argIdx)
 		args = append(args, *projectID)
@@ -290,7 +288,6 @@ func (m *TaskModel) BulkUpdateTaskOrder(userID uuid.UUID, projectID *uuid.UUID, 
 	} else {
 		where += " AND project_id IS NULL"
 	}
-
 	if parentTaskID != nil {
 		where += fmt.Sprintf(" AND parent_task_id = $%d", argIdx)
 		args = append(args, *parentTaskID)
@@ -299,12 +296,7 @@ func (m *TaskModel) BulkUpdateTaskOrder(userID uuid.UUID, projectID *uuid.UUID, 
 		where += " AND parent_task_id IS NULL"
 	}
 
-	taskIDPlaceholders := make([]string, len(updates))
-	for i := range updates {
-		taskIDPlaceholders[i] = fmt.Sprintf("$%d", argIdx+i)
-		args = append(args, updates[i].TaskID)
-	}
-	where += fmt.Sprintf(" AND task_id IN (%s)", strings.Join(taskIDPlaceholders, ", "))
+	where += fmt.Sprintf(" AND task_id IN (%s)", joinStrings(taskIDs, ", "))
 
 	query := fmt.Sprintf(`UPDATE tasks SET "order" = %s WHERE %s`, caseStmt, where)
 
@@ -314,6 +306,18 @@ func (m *TaskModel) BulkUpdateTaskOrder(userID uuid.UUID, projectID *uuid.UUID, 
 	}
 
 	return nil
+}
+
+// joinStrings joins a slice of strings with a separator.
+func joinStrings(strs []string, sep string) string {
+	if len(strs) == 0 {
+		return ""
+	}
+	result := strs[0]
+	for i := 1; i < len(strs); i++ {
+		result += sep + strs[i]
+	}
+	return result
 }
 
 func (m *TaskModel) GetTaskByID(taskID uuid.UUID, userID uuid.UUID) (Task, error) {

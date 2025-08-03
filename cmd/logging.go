@@ -41,15 +41,18 @@ func StructuredLogger(logger *slog.Logger) echo.MiddlewareFunc {
 				c.Error(err)
 			}
 
-			logger.Info("request completed",
-				"request_id", requestID,
-				"method", req.Method,
-				"uri", req.RequestURI,
-				"status", res.Status,
-				"latency", time.Since(start).String(),
-				"remote_ip", c.RealIP(),
-				"user_agent", req.UserAgent(),
-			)
+			// Skip logging for OPTIONS requests
+			if req.Method != http.MethodOptions {
+				logger.Info("request completed",
+					"request_id", requestID,
+					"method", req.Method,
+					"uri", req.RequestURI,
+					"status", res.Status,
+					"latency", time.Since(start).String(),
+					"remote_ip", c.RealIP(),
+					"user_agent", req.UserAgent(),
+				)
+			}
 
 			return nil
 		}

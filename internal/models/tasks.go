@@ -16,11 +16,11 @@ type Task struct {
 	UserID       uuid.UUID  `json:"user_id"`
 	Content      string     `json:"content"`
 	Description  string     `json:"description"`
-	DueDate      *time.Time `json:"due_date"`     // nullable time.Time: use nil for null
-	DueDatetime  *time.Time `json:"due_datetime"` // nullable time.Time: use nil for null
+	DueDate      *time.Time `json:"due_date"`
+	DueDatetime  *time.Time `json:"due_datetime"`
 	Priority     int16      `json:"priority"`
 	IsCompleted  bool       `json:"is_completed"`
-	CompletedAt  *time.Time `json:"completed_at"` // nullable time.Time: use nil for null
+	CompletedAt  *time.Time `json:"completed_at"`
 	ParentTaskID *uuid.UUID `json:"parent_task_id"`
 	Order        int        `json:"order"`
 	Labels       []string   `json:"labels"`
@@ -49,7 +49,6 @@ type NewTask struct {
 	Order        *int       `json:"order,omitempty"`
 }
 
-// AddTask inserts a new task into the database using NewTask and userID
 func (m *TaskModel) AddTask(input NewTask, userID uuid.UUID) (Task, error) {
 	query := `
 		INSERT INTO tasks (
@@ -67,7 +66,7 @@ func (m *TaskModel) AddTask(input NewTask, userID uuid.UUID) (Task, error) {
 	err := m.DB.QueryRow(
 		context.Background(),
 		query,
-		input.TaskID, // Use the provided task_id
+		input.TaskID,
 		input.ProjectID,
 		userID,
 		input.Content,
@@ -249,13 +248,11 @@ func (m *TaskModel) DeleteTaskByID(taskID uuid.UUID, userID uuid.UUID) (int64, e
 
 // ValidateTask validates a Task object
 func ValidateTask(task *Task, v *Validator) {
-	// Validate due date format if provided
 	if task.DueDate != nil {
 		dateStr := task.DueDate.Format("01/02/2006")
 		v.Check(dateStr != "", "due_date", "Due date must be in MM/DD/YYYY format")
 	}
 
-	// Validate due_datetime format if provided
 	if task.DueDatetime != nil {
 		timeStr := task.DueDatetime.Format("03:04 PM")
 		v.Check(timeStr != "", "due_datetime", "Due datetime must be in XX:XX AM/PM format")
@@ -274,7 +271,6 @@ func (m *TaskModel) BulkUpdateTaskOrder(userID uuid.UUID, projectID *uuid.UUID, 
 		return nil
 	}
 
-	// Build the CASE statement using parameterized queries
 	caseStmt := "CASE"
 	args := []any{userID}
 	argIdx := 2
@@ -286,7 +282,6 @@ func (m *TaskModel) BulkUpdateTaskOrder(userID uuid.UUID, projectID *uuid.UUID, 
 	}
 	caseStmt += " END"
 
-	// Build WHERE clause
 	where := "user_id = $1"
 	if projectID != nil {
 		where += fmt.Sprintf(" AND project_id = $%d", argIdx)
@@ -304,7 +299,6 @@ func (m *TaskModel) BulkUpdateTaskOrder(userID uuid.UUID, projectID *uuid.UUID, 
 		where += " AND parent_task_id IS NULL"
 	}
 
-	// Add task IDs to WHERE clause
 	taskIDPlaceholders := make([]string, len(updates))
 	for i := range updates {
 		taskIDPlaceholders[i] = fmt.Sprintf("$%d", argIdx+i)
@@ -322,7 +316,6 @@ func (m *TaskModel) BulkUpdateTaskOrder(userID uuid.UUID, projectID *uuid.UUID, 
 	return nil
 }
 
-// GetTaskByID fetches a single task by task_id and user_id
 func (m *TaskModel) GetTaskByID(taskID uuid.UUID, userID uuid.UUID) (Task, error) {
 	query := `
 		SELECT task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, "order", labels, created_at

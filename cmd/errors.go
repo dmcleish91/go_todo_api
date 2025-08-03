@@ -6,17 +6,14 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// ErrorResponse represents a standardized error response
 type ErrorResponse struct {
 	Error   string            `json:"error"`
 	Message string            `json:"message,omitempty"`
 	Errors  map[string]string `json:"errors,omitempty"`
 }
 
-// APIError represents a generic API error type
 type APIError string
 
-// Error enum constants
 const (
 	ErrInvalidInput       APIError = "invalid_input"
 	ErrAuthentication     APIError = "authentication_required"
@@ -32,7 +29,7 @@ const (
 	ErrServiceUnavailable APIError = "service_unavailable"
 )
 
-// Error messages for clients (generic, non-revealing)
+// Generic, non-revealing error messages for clients
 var clientErrorMessages = map[APIError]string{
 	ErrInvalidInput:       "The provided data is invalid",
 	ErrAuthentication:     "Authentication is required",
@@ -48,7 +45,6 @@ var clientErrorMessages = map[APIError]string{
 	ErrServiceUnavailable: "Service temporarily unavailable",
 }
 
-// getRequestID extracts request ID from context
 func getRequestID(c echo.Context) string {
 	if requestID, ok := c.Get("X-Request-ID").(string); ok {
 		return requestID
@@ -56,7 +52,6 @@ func getRequestID(c echo.Context) string {
 	return "unknown"
 }
 
-// sendError sends a standardized error response with JSON logging
 func (app *application) sendError(c echo.Context, statusCode int, errorType APIError, message string) error {
 	clientMsg := clientErrorMessages[errorType]
 	if message != "" {
@@ -68,7 +63,6 @@ func (app *application) sendError(c echo.Context, statusCode int, errorType APIE
 		Message: clientMsg,
 	}
 
-	// Log the error with comprehensive JSON structured data
 	app.logger.Error("api_error",
 		"request_id", getRequestID(c),
 		"error_type", string(errorType),
@@ -87,14 +81,12 @@ func (app *application) sendError(c echo.Context, statusCode int, errorType APIE
 	return c.JSON(statusCode, response)
 }
 
-// sendValidationError sends validation errors with JSON logging
 func (app *application) sendValidationError(c echo.Context, errors map[string]string) error {
 	response := ErrorResponse{
 		Error:  string(ErrValidation),
 		Errors: errors,
 	}
 
-	// Log validation errors with structured JSON data
 	app.logger.Warn("validation_error",
 		"request_id", getRequestID(c),
 		"error_type", string(ErrValidation),
@@ -111,9 +103,7 @@ func (app *application) sendValidationError(c echo.Context, errors map[string]st
 	return c.JSON(http.StatusUnprocessableEntity, response)
 }
 
-// handleDatabaseError handles database errors with comprehensive JSON logging
 func (app *application) handleDatabaseError(c echo.Context, err error, operation string) error {
-	// Log database error with detailed structured data
 	app.logger.Error("database_error",
 		"request_id", getRequestID(c),
 		"operation", operation,

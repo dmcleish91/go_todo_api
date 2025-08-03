@@ -12,9 +12,9 @@ import (
 )
 
 type SupabaseJWTClaims struct {
-	Sub   string `json:"sub"`   // User ID from Supabase
-	Email string `json:"email"` // User email
-	Role  string `json:"role"`  // User role
+	Sub   string `json:"sub"`
+	Email string `json:"email"`
+	Role  string `json:"role"`
 	jwt.RegisteredClaims
 }
 
@@ -34,13 +34,11 @@ func (app *application) Routes() *echo.Echo {
 
 	secured.Use(app.SupabaseJWTMiddleware())
 
-	// Project endpoints
 	secured.POST("/projects", app.AddNewProject)
 	secured.PUT("/projects", app.EditExistingProject)
 	secured.GET("/projects", app.GetProjectsByUserID)
 	secured.DELETE("/projects", app.DeleteProject)
 
-	// Task endpoints
 	secured.POST("/tasks", app.AddNewTask)
 	secured.PUT("/tasks", app.EditExistingTask)
 	secured.GET("/tasks", app.GetTasksByUserID)
@@ -48,7 +46,6 @@ func (app *application) Routes() *echo.Echo {
 	secured.PUT("/tasks/:id/toggle-completion", app.ToggleTaskCompletion)
 	secured.PATCH("/tasks/reorder", app.HandleReorderTasks)
 
-	// Label endpoints
 	secured.POST("/labels", app.AddNewLabel)
 	secured.PUT("/labels", app.EditExistingLabel)
 	secured.GET("/labels", app.GetLabelsByUserID)
@@ -62,23 +59,21 @@ func (app *application) SupabaseJWTMiddleware() echo.MiddlewareFunc {
 		return func(c echo.Context) error {
 			authHeader := c.Request().Header.Get("Authorization")
 			if authHeader == "" {
-				return echo.NewHTTPError(http.StatusUnauthorized, "missing authorization header")
+				return app.sendError(c, http.StatusUnauthorized, ErrAuthentication, "")
 			}
 
 			tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 			if tokenString == authHeader {
-				return echo.NewHTTPError(http.StatusUnauthorized, "invalid authorization header format")
+				return app.sendError(c, http.StatusUnauthorized, ErrAuthentication, "")
 			}
 
 			signingKey := os.Getenv("SUPABASE_JWT_SIGNINGKEY")
 			if signingKey == "" {
-				return echo.NewHTTPError(http.StatusInternalServerError, "SUPABASE_JWT_SIGNINGKEY not set")
+				return app.sendError(c, http.StatusInternalServerError, ErrInternal, "")
 			}
 
-			// Parse and validate the token
 			claims := &SupabaseJWTClaims{}
 			token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (any, error) {
-				// Verify the signing method
 				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 					return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 				}
@@ -86,14 +81,13 @@ func (app *application) SupabaseJWTMiddleware() echo.MiddlewareFunc {
 			})
 
 			if err != nil {
-				return echo.NewHTTPError(http.StatusUnauthorized, "invalid token: "+err.Error())
+				return app.sendError(c, http.StatusUnauthorized, ErrAuthentication, "")
 			}
 
 			if !token.Valid {
-				return echo.NewHTTPError(http.StatusUnauthorized, "invalid token")
+				return app.sendError(c, http.StatusUnauthorized, ErrAuthentication, "")
 			}
 
-			// Add user info to context
 			c.Set("user_id", claims.Sub)
 			c.Set("user_email", claims.Email)
 			c.Set("user_role", claims.Role)

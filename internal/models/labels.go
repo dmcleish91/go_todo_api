@@ -83,5 +83,4 @@ func ValidateLabel(label *Label, v *Validator) {
 	if label.Name == "" {
 		v.AddError("name", "Label name is required")
 	}
-	// Add more validation as needed (e.g., length, allowed characters)
 }

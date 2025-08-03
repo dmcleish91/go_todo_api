@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -36,7 +37,7 @@ type TaskModel struct {
 // user_id is not included; it comes from JWT
 // task_id is required; must be provided by frontend
 type NewTask struct {
-	TaskID       uuid.UUID  `json:"task_id"`              // REQUIRED: Frontend must provide task_id
+	TaskID       uuid.UUID  `json:"task_id"` // REQUIRED: Frontend must provide task_id
 	ProjectID    *uuid.UUID `json:"project_id,omitempty"`
 	Content      string     `json:"content"`
 	Description  *string    `json:"description,omitempty"`
@@ -66,7 +67,7 @@ func (m *TaskModel) AddTask(input NewTask, userID uuid.UUID) (Task, error) {
 	err := m.DB.QueryRow(
 		context.Background(),
 		query,
-		input.TaskID,        // Use the provided task_id
+		input.TaskID, // Use the provided task_id
 		input.ProjectID,
 		userID,
 		input.Content,
@@ -273,70 +274,52 @@ func (m *TaskModel) BulkUpdateTaskOrder(userID uuid.UUID, projectID *uuid.UUID, 
 		return nil
 	}
 
-	tx, err := m.DB.Begin(context.Background())
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() {
-		if err != nil {
-			tx.Rollback(context.Background())
-		}
-	}()
-
-	// Build the CASE statement and collect task IDs
+	// Build the CASE statement using parameterized queries
 	caseStmt := "CASE"
-	taskIDs := make([]string, 0, len(updates))
+	args := []any{userID}
+	argIdx := 2
+
 	for _, upd := range updates {
-		caseStmt += " WHEN task_id = '" + upd.TaskID + "' THEN " + fmt.Sprintf("%d", upd.Order)
-		taskIDs = append(taskIDs, "'"+upd.TaskID+"'")
+		caseStmt += fmt.Sprintf(" WHEN task_id = $%d THEN $%d", argIdx, argIdx+1)
+		args = append(args, upd.TaskID, upd.Order)
+		argIdx += 2
 	}
 	caseStmt += " END"
 
-	// Build the WHERE clause for sibling tasks
+	// Build WHERE clause
 	where := "user_id = $1"
-	args := []interface{}{userID}
-	argIdx := 2
 	if projectID != nil {
 		where += fmt.Sprintf(" AND project_id = $%d", argIdx)
 		args = append(args, *projectID)
 		argIdx++
 	} else {
-		where += fmt.Sprintf(" AND project_id IS NULL")
+		where += " AND project_id IS NULL"
 	}
+
 	if parentTaskID != nil {
 		where += fmt.Sprintf(" AND parent_task_id = $%d", argIdx)
 		args = append(args, *parentTaskID)
 		argIdx++
 	} else {
-		where += fmt.Sprintf(" AND parent_task_id IS NULL")
+		where += " AND parent_task_id IS NULL"
 	}
 
-	where += fmt.Sprintf(" AND task_id IN (%s)", joinStrings(taskIDs, ", "))
+	// Add task IDs to WHERE clause
+	taskIDPlaceholders := make([]string, len(updates))
+	for i := range updates {
+		taskIDPlaceholders[i] = fmt.Sprintf("$%d", argIdx+i)
+		args = append(args, updates[i].TaskID)
+	}
+	where += fmt.Sprintf(" AND task_id IN (%s)", strings.Join(taskIDPlaceholders, ", "))
 
 	query := fmt.Sprintf(`UPDATE tasks SET "order" = %s WHERE %s`, caseStmt, where)
 
-	_, err = tx.Exec(context.Background(), query, args...)
+	_, err := m.DB.Exec(context.Background(), query, args...)
 	if err != nil {
-		tx.Rollback(context.Background())
 		return fmt.Errorf("failed to update task order: %w", err)
 	}
 
-	if err = tx.Commit(context.Background()); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
 	return nil
-}
-
-// joinStrings joins a slice of strings with a separator.
-func joinStrings(strs []string, sep string) string {
-	if len(strs) == 0 {
-		return ""
-	}
-	result := strs[0]
-	for i := 1; i < len(strs); i++ {
-		result += sep + strs[i]
-	}
-	return result
 }
 
 // GetTaskByID fetches a single task by task_id and user_id

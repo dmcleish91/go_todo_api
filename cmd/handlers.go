@@ -112,12 +112,12 @@ func (app *application) AddNewTask(c echo.Context) error {
 	if input.Content == "" {
 		v.AddError("content", "Content is required")
 	}
-	
+
 	// NEW: Validate that task_id is provided
 	if input.TaskID == uuid.Nil {
 		v.AddError("task_id", "Task ID is required")
 	}
-	
+
 	// Optionally validate order is non-negative
 	if input.Order != nil && *input.Order < 0 {
 		v.AddError("order", "Order must be non-negative")

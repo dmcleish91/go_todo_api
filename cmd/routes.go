@@ -21,8 +21,6 @@ type SupabaseJWTClaims struct {
 func (app *application) Routes() *echo.Echo {
 	e := echo.New()
 
-	e.Use(ServerHeader)
-
 	e.Use(StructuredLogger(app.logger))
 
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
@@ -102,13 +100,5 @@ func (app *application) SupabaseJWTMiddleware() echo.MiddlewareFunc {
 
 			return next(c)
 		}
-	}
-}
-
-func ServerHeader(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		c.Response().Header().Set(echo.HeaderServer, "TodoApi/0.1")
-
-		return next(c)
 	}
 }

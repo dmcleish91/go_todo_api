@@ -15,11 +15,11 @@ type Task struct {
 	UserID       uuid.UUID  `json:"user_id"`
 	Content      string     `json:"content"`
 	Description  string     `json:"description"`
-	DueDate      *time.Time `json:"due_date"`     // nullable time.Time: use nil for null
-	DueDatetime  *time.Time `json:"due_datetime"` // nullable time.Time: use nil for null
+	DueDate      *time.Time `json:"due_date"`
+	DueDatetime  *time.Time `json:"due_datetime"`
 	Priority     int16      `json:"priority"`
 	IsCompleted  bool       `json:"is_completed"`
-	CompletedAt  *time.Time `json:"completed_at"` // nullable time.Time: use nil for null
+	CompletedAt  *time.Time `json:"completed_at"`
 	ParentTaskID *uuid.UUID `json:"parent_task_id"`
 	Order        int        `json:"order"`
 	Labels       []string   `json:"labels"`
@@ -36,7 +36,7 @@ type TaskModel struct {
 // user_id is not included; it comes from JWT
 // task_id is required; must be provided by frontend
 type NewTask struct {
-	TaskID       uuid.UUID  `json:"task_id"`              // REQUIRED: Frontend must provide task_id
+	TaskID       uuid.UUID  `json:"task_id"` // REQUIRED: Frontend must provide task_id
 	ProjectID    *uuid.UUID `json:"project_id,omitempty"`
 	Content      string     `json:"content"`
 	Description  *string    `json:"description,omitempty"`
@@ -48,7 +48,6 @@ type NewTask struct {
 	Order        *int       `json:"order,omitempty"`
 }
 
-// AddTask inserts a new task into the database using NewTask and userID
 func (m *TaskModel) AddTask(input NewTask, userID uuid.UUID) (Task, error) {
 	query := `
 		INSERT INTO tasks (
@@ -66,7 +65,7 @@ func (m *TaskModel) AddTask(input NewTask, userID uuid.UUID) (Task, error) {
 	err := m.DB.QueryRow(
 		context.Background(),
 		query,
-		input.TaskID,        // Use the provided task_id
+		input.TaskID,
 		input.ProjectID,
 		userID,
 		input.Content,
@@ -248,21 +247,17 @@ func (m *TaskModel) DeleteTaskByID(taskID uuid.UUID, userID uuid.UUID) (int64, e
 
 // ValidateTask validates a Task object
 func ValidateTask(task *Task, v *Validator) {
-	// Validate due date format if provided
 	if task.DueDate != nil {
 		dateStr := task.DueDate.Format("01/02/2006")
 		v.Check(dateStr != "", "due_date", "Due date must be in MM/DD/YYYY format")
 	}
 
-	// Validate due_datetime format if provided
 	if task.DueDatetime != nil {
 		timeStr := task.DueDatetime.Format("03:04 PM")
 		v.Check(timeStr != "", "due_datetime", "Due datetime must be in XX:XX AM/PM format")
 	}
 }
 
-// BulkUpdateTaskOrder updates the order of sibling tasks for a user, project, and parent_task_id.
-// All tasks must belong to the same user, project, and parent_task_id.
 type TaskOrderUpdate struct {
 	TaskID string `json:"task_id"`
 	Order  int    `json:"order"`
@@ -272,16 +267,6 @@ func (m *TaskModel) BulkUpdateTaskOrder(userID uuid.UUID, projectID *uuid.UUID, 
 	if len(updates) == 0 {
 		return nil
 	}
-
-	tx, err := m.DB.Begin(context.Background())
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() {
-		if err != nil {
-			tx.Rollback(context.Background())
-		}
-	}()
 
 	// Build the CASE statement and collect task IDs
 	caseStmt := "CASE"
@@ -301,29 +286,25 @@ func (m *TaskModel) BulkUpdateTaskOrder(userID uuid.UUID, projectID *uuid.UUID, 
 		args = append(args, *projectID)
 		argIdx++
 	} else {
-		where += fmt.Sprintf(" AND project_id IS NULL")
+		where += " AND project_id IS NULL"
 	}
 	if parentTaskID != nil {
 		where += fmt.Sprintf(" AND parent_task_id = $%d", argIdx)
 		args = append(args, *parentTaskID)
 		argIdx++
 	} else {
-		where += fmt.Sprintf(" AND parent_task_id IS NULL")
+		where += " AND parent_task_id IS NULL"
 	}
 
 	where += fmt.Sprintf(" AND task_id IN (%s)", joinStrings(taskIDs, ", "))
 
 	query := fmt.Sprintf(`UPDATE tasks SET "order" = %s WHERE %s`, caseStmt, where)
 
-	_, err = tx.Exec(context.Background(), query, args...)
+	_, err := m.DB.Exec(context.Background(), query, args...)
 	if err != nil {
-		tx.Rollback(context.Background())
 		return fmt.Errorf("failed to update task order: %w", err)
 	}
 
-	if err = tx.Commit(context.Background()); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
 	return nil
 }
 
@@ -339,7 +320,6 @@ func joinStrings(strs []string, sep string) string {
 	return result
 }
 
-// GetTaskByID fetches a single task by task_id and user_id
 func (m *TaskModel) GetTaskByID(taskID uuid.UUID, userID uuid.UUID) (Task, error) {
 	query := `
 		SELECT task_id, project_id, user_id, content, description, due_date, due_datetime, priority, is_completed, completed_at, parent_task_id, "order", labels, created_at

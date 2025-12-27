@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/dmcleish91/go_todo_api/internal/models"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
 
@@ -16,8 +17,12 @@ type application struct {
 	logger   *slog.Logger
 }
 
+var db *pgxpool.Pool
+
 func main() {
 	godotenv.Load()
+	loadConfig()
+	
 	user := os.Getenv("user")
 	password := os.Getenv("password")
 	host := os.Getenv("host")
@@ -29,6 +34,7 @@ func main() {
 	DATABASE_URL := fmt.Sprintf("postgresql://%s:%s@%s:%s/%s", user, password, host, port, dbname)
 
 	conn := CreateDatabaseConnection(DATABASE_URL)
+	db = conn
 	defer conn.Close()
 
 	app := &application{

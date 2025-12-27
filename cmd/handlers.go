@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/dmcleish91/go_todo_api/internal/models"
@@ -9,10 +10,7 @@ import (
 )
 
 func GetUserID(c echo.Context) string {
-	if userID, ok := c.Get("user_id").(string); ok {
-		return userID
-	}
-	return ""
+	return DemoUserID
 }
 
 // Project Handlers
@@ -382,4 +380,34 @@ func (app *application) HandleReorderTasks(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
 	return c.JSON(http.StatusOK, map[string]string{"message": "Task order updated successfully"})
+}
+
+// ResetDemoData handles POST /v1/reset
+// Deletes all existing data for the demo user and seeds fresh demo data
+func (app *application) ResetDemoData(c echo.Context) error {
+	ctx := c.Request().Context()
+	userID := GetUserID(c)
+
+	// Delete existing data (order matters for FK constraints)
+	_, err := db.Exec(ctx, "DELETE FROM tasks WHERE user_id = $1", userID)
+	if err != nil {
+		return c.JSON(500, map[string]string{"error": "Failed to delete tasks"})
+	}
+
+	_, err = db.Exec(ctx, "DELETE FROM labels WHERE user_id = $1", userID)
+	if err != nil {
+		return c.JSON(500, map[string]string{"error": "Failed to delete labels"})
+	}
+
+	_, err = db.Exec(ctx, "DELETE FROM projects WHERE user_id = $1", userID)
+	if err != nil {
+		return c.JSON(500, map[string]string{"error": "Failed to delete projects"})
+	}
+
+	// Seed demo data
+	if err := SeedDemoData(ctx, userID); err != nil {
+		return c.JSON(500, map[string]string{"error": "Failed to seed demo data"})
+	}
+
+	return c.JSON(200, map[string]string{"status": "ok"})
 }

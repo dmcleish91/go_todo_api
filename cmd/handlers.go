@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/dmcleish91/go_todo_api/internal/models"
@@ -110,12 +109,12 @@ func (app *application) AddNewTask(c echo.Context) error {
 	if input.Content == "" {
 		v.AddError("content", "Content is required")
 	}
-	
+
 	// NEW: Validate that task_id is provided
 	if input.TaskID == uuid.Nil {
 		v.AddError("task_id", "Task ID is required")
 	}
-	
+
 	// Optionally validate order is non-negative
 	if input.Order != nil && *input.Order < 0 {
 		v.AddError("order", "Order must be non-negative")
@@ -176,6 +175,7 @@ func (app *application) GetTasksByUserID(c echo.Context) error {
 	}
 	tasks, err := app.tasks.GetTasksByUserID(uid)
 	if err != nil {
+		app.logger.Error("failed to get tasks", "error", err, "user_id", uid)
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
 	return c.JSON(http.StatusOK, tasks)
@@ -391,21 +391,25 @@ func (app *application) ResetDemoData(c echo.Context) error {
 	// Delete existing data (order matters for FK constraints)
 	_, err := db.Exec(ctx, "DELETE FROM tasks WHERE user_id = $1", userID)
 	if err != nil {
+		app.logger.Error("failed to delete tasks", "error", err, "user_id", userID)
 		return c.JSON(500, map[string]string{"error": "Failed to delete tasks"})
 	}
 
 	_, err = db.Exec(ctx, "DELETE FROM labels WHERE user_id = $1", userID)
 	if err != nil {
+		app.logger.Error("failed to delete labels", "error", err, "user_id", userID)
 		return c.JSON(500, map[string]string{"error": "Failed to delete labels"})
 	}
 
 	_, err = db.Exec(ctx, "DELETE FROM projects WHERE user_id = $1", userID)
 	if err != nil {
+		app.logger.Error("failed to delete projects", "error", err, "user_id", userID)
 		return c.JSON(500, map[string]string{"error": "Failed to delete projects"})
 	}
 
 	// Seed demo data
 	if err := SeedDemoData(ctx, userID); err != nil {
+		app.logger.Error("failed to seed demo data", "error", err, "user_id", userID)
 		return c.JSON(500, map[string]string{"error": "Failed to seed demo data"})
 	}
 

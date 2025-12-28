@@ -1,5 +1,15 @@
 -- The queries.sql file is a reference for all the SQL statements used in the application.
 
+-- Note: For demo mode, the following foreign key constraints on user_id have been removed:
+--   - projects_user_id_fkey (projects.user_id -> auth.users.id)
+--   - labels_user_id_fkey (labels.user_id -> auth.users.id)
+--   - tasks_user_id_fkey (tasks.user_id -> auth.users.id)
+--
+-- To remove these constraints from existing tables, run:
+--   ALTER TABLE projects DROP CONSTRAINT IF EXISTS projects_user_id_fkey;
+--   ALTER TABLE labels DROP CONSTRAINT IF EXISTS labels_user_id_fkey;
+--   ALTER TABLE tasks DROP CONSTRAINT IF EXISTS tasks_user_id_fkey;
+
 CREATE TABLE IF NOT EXISTS public.projects (
     project_id uuid NOT NULL DEFAULT gen_random_uuid(),
     user_id uuid NOT NULL,
@@ -9,8 +19,8 @@ CREATE TABLE IF NOT EXISTS public.projects (
     parent_project_id uuid,
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     CONSTRAINT projects_pkey PRIMARY KEY (project_id),
-    CONSTRAINT projects_parent_project_id_fkey FOREIGN KEY (parent_project_id) REFERENCES public.projects(project_id),
-    CONSTRAINT projects_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+    CONSTRAINT projects_parent_project_id_fkey FOREIGN KEY (parent_project_id) REFERENCES public.projects(project_id)
+    -- Note: user_id foreign key constraint removed for demo mode
 );
 
 CREATE TABLE IF NOT EXISTS public.labels (
@@ -19,8 +29,8 @@ CREATE TABLE IF NOT EXISTS public.labels (
     name character varying NOT NULL,
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     CONSTRAINT labels_pkey PRIMARY KEY (label_id),
-    CONSTRAINT labels_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
     CONSTRAINT labels_user_name_unique UNIQUE (user_id, name)
+    -- Note: user_id foreign key constraint removed for demo mode
 );
 
 CREATE TABLE IF NOT EXISTS public.tasks (
@@ -40,8 +50,8 @@ CREATE TABLE IF NOT EXISTS public.tasks (
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     CONSTRAINT tasks_pkey PRIMARY KEY (task_id),
     CONSTRAINT tasks_parent_task_id_fkey FOREIGN KEY (parent_task_id) REFERENCES public.tasks(task_id) ON UPDATE CASCADE ON DELETE CASCADE,
-    CONSTRAINT tasks_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(project_id) ON DELETE CASCADE,
-    CONSTRAINT tasks_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+    CONSTRAINT tasks_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(project_id) ON DELETE CASCADE
+    -- Note: user_id foreign key constraint removed for demo mode
 );
 
 

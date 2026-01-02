@@ -22,7 +22,7 @@ var db *pgxpool.Pool
 func main() {
 	godotenv.Load()
 	loadConfig()
-	
+
 	user := os.Getenv("user")
 	password := os.Getenv("password")
 	host := os.Getenv("host")

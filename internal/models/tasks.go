@@ -15,7 +15,7 @@ type Task struct {
 	ProjectID    *uuid.UUID `json:"project_id"`
 	UserID       uuid.UUID  `json:"user_id"`
 	Content      string     `json:"content"`
-	Description  *string    `json:"description"` // nullable: use nil for null
+	Description  *string    `json:"description"`  // nullable: use nil for null
 	DueDate      *time.Time `json:"due_date"`     // nullable time.Time: use nil for null
 	DueDatetime  *time.Time `json:"due_datetime"` // nullable time.Time: use nil for null
 	Priority     int16      `json:"priority"`
@@ -37,7 +37,7 @@ type TaskModel struct {
 // user_id is not included; it comes from JWT
 // task_id is required; must be provided by frontend
 type NewTask struct {
-	TaskID       uuid.UUID  `json:"task_id"`              // REQUIRED: Frontend must provide task_id
+	TaskID       uuid.UUID  `json:"task_id"` // REQUIRED: Frontend must provide task_id
 	ProjectID    *uuid.UUID `json:"project_id,omitempty"`
 	Content      string     `json:"content"`
 	Description  *string    `json:"description,omitempty"`
@@ -64,18 +64,18 @@ func (m *TaskModel) AddTask(input NewTask, userID uuid.UUID) (Task, error) {
 	if input.Order != nil {
 		orderValue = *input.Order
 	}
-	
+
 	// Marshal labels to JSON for insertion
 	labelsJSON, err := json.Marshal(input.Labels)
 	if err != nil {
 		return Task{}, fmt.Errorf("unable to marshal labels: %v", err)
 	}
-	
+
 	var labelsJSONReturned []byte
 	err = m.DB.QueryRow(
 		context.Background(),
 		query,
-		input.TaskID,        // Use the provided task_id
+		input.TaskID, // Use the provided task_id
 		input.ProjectID,
 		userID,
 		input.Content,
@@ -105,7 +105,7 @@ func (m *TaskModel) AddTask(input NewTask, userID uuid.UUID) (Task, error) {
 	if err != nil {
 		return Task{}, fmt.Errorf("unable to execute query: %v", err)
 	}
-	
+
 	// Unmarshal JSONB labels into []string
 	if len(labelsJSONReturned) > 0 {
 		if err := json.Unmarshal(labelsJSONReturned, &createdTask.Labels); err != nil {
@@ -137,13 +137,13 @@ func (m *TaskModel) EditTaskByID(task Task) (Task, error) {
 	`
 
 	var updatedTask Task
-	
+
 	// Marshal labels to JSON for update
 	labelsJSON, err := json.Marshal(task.Labels)
 	if err != nil {
 		return Task{}, fmt.Errorf("unable to marshal labels: %v", err)
 	}
-	
+
 	var labelsJSONReturned []byte
 	err = m.DB.QueryRow(
 		context.Background(),
@@ -180,7 +180,7 @@ func (m *TaskModel) EditTaskByID(task Task) (Task, error) {
 	if err != nil {
 		return Task{}, fmt.Errorf("unable to execute query: %v", err)
 	}
-	
+
 	// Unmarshal JSONB labels into []string
 	if len(labelsJSONReturned) > 0 {
 		if err := json.Unmarshal(labelsJSONReturned, &updatedTask.Labels); err != nil {
@@ -230,7 +230,7 @@ func (m *TaskModel) GetTasksByUserID(userID uuid.UUID) ([]Task, error) {
 		if err != nil {
 			return nil, fmt.Errorf("unable to scan row: %v", err)
 		}
-		
+
 		// Unmarshal JSONB labels into []string
 		if len(labelsJSON) > 0 {
 			if err := json.Unmarshal(labelsJSON, &task.Labels); err != nil {
@@ -239,7 +239,7 @@ func (m *TaskModel) GetTasksByUserID(userID uuid.UUID) ([]Task, error) {
 		} else {
 			task.Labels = []string{}
 		}
-		
+
 		tasks = append(tasks, task)
 	}
 
@@ -278,7 +278,7 @@ func (m *TaskModel) ToggleTaskCompleted(taskID uuid.UUID, userID uuid.UUID) (Tas
 	if err != nil {
 		return Task{}, fmt.Errorf("unable to execute query: %v", err)
 	}
-	
+
 	// Unmarshal JSONB labels into []string
 	if len(labelsJSON) > 0 {
 		if err := json.Unmarshal(labelsJSON, &updatedTask.Labels); err != nil {
@@ -423,7 +423,7 @@ func (m *TaskModel) GetTaskByID(taskID uuid.UUID, userID uuid.UUID) (Task, error
 	if err != nil {
 		return Task{}, fmt.Errorf("unable to fetch task: %w", err)
 	}
-	
+
 	// Unmarshal JSONB labels into []string
 	if len(labelsJSON) > 0 {
 		if err := json.Unmarshal(labelsJSON, &task.Labels); err != nil {
@@ -432,6 +432,6 @@ func (m *TaskModel) GetTaskByID(taskID uuid.UUID, userID uuid.UUID) (Task, error
 	} else {
 		task.Labels = []string{}
 	}
-	
+
 	return task, nil
 }

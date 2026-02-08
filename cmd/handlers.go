@@ -383,34 +383,47 @@ func (app *application) HandleReorderTasks(c echo.Context) error {
 }
 
 // ResetDemoData handles POST /v1/reset
-// Deletes all existing data for the demo user and seeds fresh demo data
+// Deletes all existing data for the demo user and seeds fresh demo data.
+// Runs in a transaction so concurrent calls are safe and idempotent.
 func (app *application) ResetDemoData(c echo.Context) error {
 	ctx := c.Request().Context()
 	userID := GetUserID(c)
 
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		app.logger.Error("failed to begin transaction", "error", err, "user_id", userID)
+		return c.JSON(500, map[string]string{"error": "Failed to begin transaction"})
+	}
+	defer tx.Rollback(ctx)
+
 	// Delete existing data (order matters for FK constraints)
-	_, err := db.Exec(ctx, "DELETE FROM tasks WHERE user_id = $1", userID)
+	_, err = tx.Exec(ctx, "DELETE FROM tasks WHERE user_id = $1", userID)
 	if err != nil {
 		app.logger.Error("failed to delete tasks", "error", err, "user_id", userID)
 		return c.JSON(500, map[string]string{"error": "Failed to delete tasks"})
 	}
 
-	_, err = db.Exec(ctx, "DELETE FROM labels WHERE user_id = $1", userID)
+	_, err = tx.Exec(ctx, "DELETE FROM labels WHERE user_id = $1", userID)
 	if err != nil {
 		app.logger.Error("failed to delete labels", "error", err, "user_id", userID)
 		return c.JSON(500, map[string]string{"error": "Failed to delete labels"})
 	}
 
-	_, err = db.Exec(ctx, "DELETE FROM projects WHERE user_id = $1", userID)
+	_, err = tx.Exec(ctx, "DELETE FROM projects WHERE user_id = $1", userID)
 	if err != nil {
 		app.logger.Error("failed to delete projects", "error", err, "user_id", userID)
 		return c.JSON(500, map[string]string{"error": "Failed to delete projects"})
 	}
 
-	// Seed demo data
-	if err := SeedDemoData(ctx, userID); err != nil {
+	// Seed demo data within the same transaction
+	if err := SeedDemoData(ctx, tx, userID); err != nil {
 		app.logger.Error("failed to seed demo data", "error", err, "user_id", userID)
 		return c.JSON(500, map[string]string{"error": "Failed to seed demo data"})
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		app.logger.Error("failed to commit transaction", "error", err, "user_id", userID)
+		return c.JSON(500, map[string]string{"error": "Failed to commit transaction"})
 	}
 
 	return c.JSON(200, map[string]string{"status": "ok"})

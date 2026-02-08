@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS public.projects (
     user_id uuid NOT NULL,
     project_name character varying NOT NULL,
     color character varying,
-    is_inbox boolean DEFAULT false,
+
     parent_project_id uuid,
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     CONSTRAINT projects_pkey PRIMARY KEY (project_id),
@@ -59,22 +59,21 @@ CREATE TABLE IF NOT EXISTS public.tasks (
 
 -- AddProject
 INSERT INTO projects (
-    user_id, project_name, color, is_inbox, parent_project_id
+    user_id, project_name, color, parent_project_id
 ) VALUES (
-    $1, $2, $3, $4, $5
-) RETURNING project_id, user_id, project_name, color, is_inbox, parent_project_id;
+    $1, $2, $3, $4
+) RETURNING project_id, user_id, project_name, color, parent_project_id;
 
 -- EditProjectByID
 UPDATE projects SET
     project_name = $3,
     color = $4,
-    is_inbox = $5,
-    parent_project_id = $6
+    parent_project_id = $5
 WHERE project_id = $1 AND user_id = $2
-RETURNING project_id, user_id, project_name, color, is_inbox, parent_project_id;
+RETURNING project_id, user_id, project_name, color, parent_project_id;
 
 -- GetProjectsByUserID
-SELECT project_id, user_id, project_name, color, is_inbox, parent_project_id
+SELECT project_id, user_id, project_name, color, parent_project_id
 FROM projects
 WHERE user_id = $1
 ORDER BY project_name ASC;

@@ -14,7 +14,6 @@ type Project struct {
 	UserID          uuid.UUID  `json:"user_id"`
 	ProjectName     string     `json:"project_name"`
 	Color           *string    `json:"color"`
-	IsInbox         *bool      `json:"is_inbox"`
 	ParentProjectID *uuid.UUID `json:"parent_project_id"`
 	CreatedAt       time.Time  `json:"created_at"`
 }
@@ -26,10 +25,10 @@ type ProjectModel struct {
 func (m *ProjectModel) AddProject(project Project) (Project, error) {
 	query := `
 		INSERT INTO projects (
-			user_id, project_name, color, is_inbox, parent_project_id
+			user_id, project_name, color, parent_project_id
 		) VALUES (
-			$1, $2, $3, $4, $5
-		) RETURNING project_id, user_id, project_name, color, is_inbox, parent_project_id, created_at
+			$1, $2, $3, $4
+		) RETURNING project_id, user_id, project_name, color, parent_project_id, created_at
 	`
 
 	var createdProject Project
@@ -39,14 +38,12 @@ func (m *ProjectModel) AddProject(project Project) (Project, error) {
 		project.UserID,
 		project.ProjectName,
 		project.Color,
-		project.IsInbox,
 		project.ParentProjectID,
 	).Scan(
 		&createdProject.ProjectID,
 		&createdProject.UserID,
 		&createdProject.ProjectName,
 		&createdProject.Color,
-		&createdProject.IsInbox,
 		&createdProject.ParentProjectID,
 		&createdProject.CreatedAt,
 	)
@@ -63,10 +60,9 @@ func (m *ProjectModel) EditProjectByID(project Project) (Project, error) {
 		UPDATE projects SET
 			project_name = $3,
 			color = $4,
-			is_inbox = $5,
-			parent_project_id = $6
+			parent_project_id = $5
 		WHERE project_id = $1 AND user_id = $2
-		RETURNING project_id, user_id, project_name, color, is_inbox, parent_project_id, created_at
+		RETURNING project_id, user_id, project_name, color, parent_project_id, created_at
 	`
 
 	var updatedProject Project
@@ -77,14 +73,12 @@ func (m *ProjectModel) EditProjectByID(project Project) (Project, error) {
 		project.UserID,
 		project.ProjectName,
 		project.Color,
-		project.IsInbox,
 		project.ParentProjectID,
 	).Scan(
 		&updatedProject.ProjectID,
 		&updatedProject.UserID,
 		&updatedProject.ProjectName,
 		&updatedProject.Color,
-		&updatedProject.IsInbox,
 		&updatedProject.ParentProjectID,
 		&updatedProject.CreatedAt,
 	)
@@ -98,7 +92,7 @@ func (m *ProjectModel) EditProjectByID(project Project) (Project, error) {
 
 func (m *ProjectModel) GetProjectsByUserID(userID uuid.UUID) ([]Project, error) {
 	query := `
-		SELECT project_id, user_id, project_name, color, is_inbox, parent_project_id, created_at
+		SELECT project_id, user_id, project_name, color, parent_project_id, created_at
 		FROM projects
 		WHERE user_id = $1
 		ORDER BY created_at ASC`
@@ -118,7 +112,6 @@ func (m *ProjectModel) GetProjectsByUserID(userID uuid.UUID) ([]Project, error) 
 			&project.UserID,
 			&project.ProjectName,
 			&project.Color,
-			&project.IsInbox,
 			&project.ParentProjectID,
 			&project.CreatedAt,
 		)
